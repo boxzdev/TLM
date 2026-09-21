@@ -28,6 +28,9 @@ MODELS_DIR = os.path.join(PROJECT_ROOT, "models")
 # Guarantees full coverage even for characters the training data happens
 # not to contain, so chat.py never silently drops a character someone
 # types later.
+# Special tokens always occupy ids 0..3, ahead of every character.
+SPECIAL_TOKENS = ["<pad>", "<unk>", "<bos>", "<eos>"]
+
 SAFETY_CHARS = string.ascii_letters + string.digits + string.punctuation + " \n\t"
 
 
@@ -44,13 +47,22 @@ class Tokenizer:
     def __init__(self, vocab=None):
         self.token_to_id = vocab or {}
         self.id_to_token = {i: t for t, i in self.token_to_id.items()}
+        # Old vocab files without special tokens still load fine.
+        self.specials = [t for t in SPECIAL_TOKENS if t in self.token_to_id]
+
+    pad_id = property(lambda self: self.token_to_id.get("<pad>"))
+    unk_id = property(lambda self: self.token_to_id.get("<unk>"))
+    bos_id = property(lambda self: self.token_to_id.get("<bos>"))
+    eos_id = property(lambda self: self.token_to_id.get("<eos>"))
 
     @classmethod
     def build(cls, text, extra_chars=SAFETY_CHARS):
         chars = set(text) | set(extra_chars)
         # Sorted for a deterministic, reproducible vocab (same text always
         # produces the same token ids across runs/machines).
-        vocab = {ch: i for i, ch in enumerate(sorted(chars))}
+        vocab = {tok: i for i, tok in enumerate(SPECIAL_TOKENS)}
+        for ch in sorted(chars):
+            vocab[ch] = len(vocab)
         return cls(vocab)
 
     @classmethod
@@ -65,13 +77,34 @@ class Tokenizer:
             json.dump({"type": "char", "vocab": self.token_to_id},
                        f, indent=2, ensure_ascii=False)
 
-    def encode(self, text):
-        # Unknown characters are skipped rather than crashing -- matches
-        # chat.py's SimpleTokenizer fallback behavior exactly.
-        return [self.token_to_id[ch] for ch in text if ch in self.token_to_id]
+    def encode(self, text, parse_special=True):
+        # Special-token strings like "<eos>" become a single id. Unknown
+        # characters map to <unk> (or are skipped if the vocab has none).
+        ids, i, n = [], 0, len(text)
+        specials = self.specials if parse_special else []
+        while i < n:
+            if text[i] == "<":
+                tok = next((t for t in specials if text.startswith(t, i)), None)
+                if tok:
+                    ids.append(self.token_to_id[tok])
+                    i += len(tok)
+                    continue
+            ch = text[i]
+            i += 1
+            if ch in self.token_to_id:
+                ids.append(self.token_to_id[ch])
+            elif self.unk_id is not None:
+                ids.append(self.unk_id)
+        return ids
 
-    def decode(self, ids):
-        return "".join(self.id_to_token.get(i, "") for i in ids)
+    def decode(self, ids, skip_special=False):
+        out = []
+        for i in ids:
+            t = self.id_to_token.get(i, "")
+            if skip_special and t in self.specials:
+                continue
+            out.append(t)
+        return "".join(out)
 
     @property
     def vocab_size(self):
