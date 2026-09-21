@@ -122,14 +122,21 @@ def generate_reply(model, tokenizer, prompt_ids, max_new_tokens=200,
     rng = rng or np.random.default_rng()
     ids = list(prompt_ids)
     generated_ids = []
+    eos_id = tokenizer.token_to_id.get("<eos>")
+    blocked = [tokenizer.token_to_id[t] for t in ("<pad>", "<bos>", "<unk>")
+               if t in tokenizer.token_to_id]
 
     for _ in range(max_new_tokens):
         window = ids[-model.max_seq_len:]
         logits, _, _ = model.forward(np.array(window))
         last_logits = logits[-1] / max(temperature, 1e-6)
+        for b in blocked:
+            last_logits[b] = -1e9
         probs = softmax(last_logits)
         next_id = int(rng.choice(model.vocab_size, p=probs))
 
+        if next_id == eos_id:
+            break
         ids.append(next_id)
         generated_ids.append(next_id)
 
