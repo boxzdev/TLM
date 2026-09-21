@@ -1,0 +1,10 @@
+{
+  "model_name": "AI",
+  "total_steps": 1600,
+  "last_loss": 0.05550665780901909,
+  "vocab_size": 101,
+  "saved_at": "2026-09-21 11:54:42",
+  "interrupted": false,
+  "fine_tuned": true,
+  "fine_tune_examples": 32
+}

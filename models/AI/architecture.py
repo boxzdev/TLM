@@ -185,7 +185,7 @@ def sinusoidal_positional_encoding(max_len, d_model):
 # ============================================================================
 
 class MultiHeadAttention:
-    def __init__(self, d_model, num_heads, rng):
+    def __init__(self, d_model, num_heads, rng, num_layers=1):
         assert d_model % num_heads == 0, "d_model must be divisible by num_heads"
         self.d_model = d_model
         self.num_heads = num_heads
@@ -194,7 +194,19 @@ class MultiHeadAttention:
         self.Wq = xavier(rng, (d_model, d_model))
         self.Wk = xavier(rng, (d_model, d_model))
         self.Wv = xavier(rng, (d_model, d_model))
-        self.Wo = xavier(rng, (d_model, d_model))
+        # Wo feeds straight into the residual add. In this Post-LN stack
+        # (Add & Norm AFTER the sublayer, per the architecture diagram)
+        # the residual stream is never renormalized until after it's been
+        # added to, so each block's contribution compounds across depth --
+        # with plain Xavier init, a handful of layers is enough for the
+        # signal reaching early blocks to blow up and gradients to those
+        # blocks to vanish, and training silently collapses to predicting
+        # each token's raw unconditional frequency (measurably verified:
+        # its loss plateau lands exactly on the corpus's zero-context
+        # character entropy). Scaling Wo by 1/sqrt(2*num_layers) at init
+        # (the fix GPT-2 uses to make deep Post-LN-style stacks trainable)
+        # keeps that compounding bounded regardless of depth.
+        self.Wo = xavier(rng, (d_model, d_model)) / math.sqrt(2 * num_layers)
         self.bq = np.zeros(d_model, dtype=np.float32)
         self.bk = np.zeros(d_model, dtype=np.float32)
         self.bv = np.zeros(d_model, dtype=np.float32)
@@ -269,10 +281,12 @@ class MultiHeadAttention:
 # ============================================================================
 
 class FeedForward:
-    def __init__(self, d_model, d_ff, rng):
+    def __init__(self, d_model, d_ff, rng, num_layers=1):
         self.W1 = xavier(rng, (d_model, d_ff))
         self.b1 = np.zeros(d_ff, dtype=np.float32)
-        self.W2 = xavier(rng, (d_ff, d_model))
+        # Same reasoning as MultiHeadAttention.Wo above -- W2 also feeds
+        # straight into the residual add.
+        self.W2 = xavier(rng, (d_ff, d_model)) / math.sqrt(2 * num_layers)
         self.b2 = np.zeros(d_model, dtype=np.float32)
 
     def params(self):
@@ -303,9 +317,9 @@ class FeedForward:
 # ============================================================================
 
 class DecoderBlock:
-    def __init__(self, d_model, num_heads, d_ff, rng):
-        self.attn = MultiHeadAttention(d_model, num_heads, rng)
-        self.ffn = FeedForward(d_model, d_ff, rng)
+    def __init__(self, d_model, num_heads, d_ff, rng, num_layers=1):
+        self.attn = MultiHeadAttention(d_model, num_heads, rng, num_layers=num_layers)
+        self.ffn = FeedForward(d_model, d_ff, rng, num_layers=num_layers)
         self.gamma1 = np.ones(d_model, dtype=np.float32)
         self.beta1 = np.zeros(d_model, dtype=np.float32)
         self.gamma2 = np.ones(d_model, dtype=np.float32)
@@ -402,7 +416,7 @@ class TinyTransformer:
         self.pos_encoding = sinusoidal_positional_encoding(max_seq_len, d_model)
 
         # Nx decoder blocks
-        self.blocks = [DecoderBlock(d_model, num_heads, self.d_ff, rng)
+        self.blocks = [DecoderBlock(d_model, num_heads, self.d_ff, rng, num_layers=num_layers)
                         for _ in range(num_layers)]
 
         # Final Linear -> Softmax head
