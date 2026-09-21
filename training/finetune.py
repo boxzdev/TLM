@@ -51,13 +51,6 @@ from tokenizer import Tokenizer, list_models  # noqa: E402
 
 DEFAULT_EPOCHS = 30
 DEFAULT_LEARNING_RATE = 0.0005  # lower than base training -- small data, easy to overfit
-WARMUP_STEPS = 100  # same Post-LN warmup fix as train.py, shorter since data is tiny
-
-
-def lr_with_warmup(step, base_lr, warmup_steps=WARMUP_STEPS):
-    if step >= warmup_steps:
-        return base_lr
-    return base_lr * (step + 1) / warmup_steps
 
 
 def import_from_path(module_name, path):
@@ -130,6 +123,7 @@ def build_examples(conversations, tokenizer, max_seq_len):
     as part of the prompt, so the model is never asked to produce it)."""
     examples = []
     skipped = 0
+    eos = "<eos>" if getattr(tokenizer, "eos_id", None) is not None else ""
 
     for msgs in conversations:
         text_parts = []   # list of (substring, mask_value)
@@ -139,7 +133,7 @@ def build_examples(conversations, tokenizer, max_seq_len):
                 question = msgs[i]["content"]
                 answer = msgs[i + 1]["content"]
                 text_parts.append((f"User: {question}\nBot: ", 0))
-                text_parts.append((f"{answer}\n", 1))
+                text_parts.append((f"{answer}\n{eos}", 1))
                 i += 2
             else:
                 i += 1
@@ -239,8 +233,7 @@ def finetune(model_name):
             for idx in order:
                 input_ids, target_ids, loss_mask = examples[idx]
                 loss, grads = model.loss_and_grads(input_ids, target_ids, loss_mask=loss_mask)
-                lr = lr_with_warmup(total_steps, DEFAULT_LEARNING_RATE)
-                model.update(grads, learning_rate=lr)
+                model.update(grads, learning_rate=DEFAULT_LEARNING_RATE)
                 epoch_loss += loss
                 active_tokens += max(int(loss_mask.sum()), 1)
                 total_steps += 1
