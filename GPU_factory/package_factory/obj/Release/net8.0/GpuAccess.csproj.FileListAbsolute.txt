@@ -1,0 +1,15 @@
+C:\TLM v5 new\GPU_factory\package_factory\bin\Release\net8.0\GpuAccess.deps.json
+C:\TLM v5 new\GPU_factory\package_factory\bin\Release\net8.0\GpuAccess.dll
+C:\TLM v5 new\GPU_factory\package_factory\bin\Release\net8.0\GpuAccess.pdb
+C:\TLM v5 new\GPU_factory\package_factory\bin\Release\net8.0\ILGPU.dll
+C:\TLM v5 new\GPU_factory\package_factory\bin\Release\net8.0\ILGPU.Algorithms.dll
+C:\TLM v5 new\GPU_factory\package_factory\obj\Release\net8.0\GpuAccess.csproj.AssemblyReference.cache
+C:\TLM v5 new\GPU_factory\package_factory\obj\Release\net8.0\GpuAccess.GeneratedMSBuildEditorConfig.editorconfig
+C:\TLM v5 new\GPU_factory\package_factory\obj\Release\net8.0\GpuAccess.AssemblyInfoInputs.cache
+C:\TLM v5 new\GPU_factory\package_factory\obj\Release\net8.0\GpuAccess.AssemblyInfo.cs
+C:\TLM v5 new\GPU_factory\package_factory\obj\Release\net8.0\GpuAccess.csproj.CoreCompileInputs.cache
+C:\TLM v5 new\GPU_factory\package_factory\obj\Release\net8.0\GpuAccess.csproj.Up2Date
+C:\TLM v5 new\GPU_factory\package_factory\obj\Release\net8.0\GpuAccess.dll
+C:\TLM v5 new\GPU_factory\package_factory\obj\Release\net8.0\refint\GpuAccess.dll
+C:\TLM v5 new\GPU_factory\package_factory\obj\Release\net8.0\GpuAccess.pdb
+C:\TLM v5 new\GPU_factory\package_factory\obj\Release\net8.0\ref\GpuAccess.dll

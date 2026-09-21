@@ -1,0 +1,19 @@
+# TLM (Tiny Language Model) Dependencies
+
+# Core dependency (CPU array math)
+# NumPy provides fast matrix operations for training/inference without
+# any ML framework. The architecture (attention, feed-forward, backprop)
+# is hand-written -- NumPy is only used for the underlying matmuls/etc.
+numpy>=1.20.0
+
+# Optional GPU acceleration (NVIDIA CUDA / AMD ROCm) via CuPy:
+#   NVIDIA:  pip install cupy-cuda12x   (or cupy-cuda11x / cupy-cuda13x)
+#   AMD:     pip install cupy-rocm-6-0  (or cupy-rocm-7-0)
+# Or see requirements-gpu.txt.
+#
+# For AMD/Intel/NVIDIA GPU support without CUDA, build GPU_factory's
+# cugpu package instead (GPU_factory/build_package.bat) -- see
+# GPU_factory/README.md. Select it via factory_TLM.py's device prompt.
+#
+# If no GPU backend is installed/detected, everything runs on CPU
+# automatically -- no extra setup needed.

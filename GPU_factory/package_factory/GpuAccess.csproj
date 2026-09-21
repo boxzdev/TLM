@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>GpuAccess</AssemblyName>
+    <RootNamespace>GpuAccess</RootNamespace>
+    <Platforms>x64</Platforms>
+    <!-- Needed so pythonnet can call into this assembly cleanly -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- ILGPU gives one API that works over CUDA (NVIDIA), OpenCL (AMD/Intel/NVIDIA)
+         and a CPU accelerator fallback, so this project doesn't need to hard-code
+         a single GPU vendor. -->
+    <PackageReference Include="ILGPU" Version="1.5.1" />
+    <!-- Companion package required for XMath (Exp/Max/etc.) and the
+         EnableAlgorithms() context option used in GpuArrayOps.cs. -->
+    <PackageReference Include="ILGPU.Algorithms" Version="1.5.1" />
+  </ItemGroup>
+
+</Project>

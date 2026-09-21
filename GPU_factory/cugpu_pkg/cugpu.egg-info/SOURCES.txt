@@ -1,0 +1,11 @@
+README.md
+pyproject.toml
+cugpu/__init__.py
+cugpu.egg-info/PKG-INFO
+cugpu.egg-info/SOURCES.txt
+cugpu.egg-info/dependency_links.txt
+cugpu.egg-info/requires.txt
+cugpu.egg-info/top_level.txt
+cugpu/_native/GpuAccess.dll
+cugpu/_native/ILGPU.Algorithms.dll
+cugpu/_native/ILGPU.dll

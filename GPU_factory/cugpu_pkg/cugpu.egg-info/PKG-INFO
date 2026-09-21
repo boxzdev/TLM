@@ -1,0 +1,35 @@
+Metadata-Version: 2.4
+Name: cugpu
+Version: 0.1.0
+Summary: Python package that accesses the GPU through a C# / ILGPU backend
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+Requires-Dist: pythonnet>=3.0.3
+Requires-Dist: numpy
+
+# cugpu
+
+A Python package that reaches the GPU through a compiled C# (.NET) library
+(`GpuAccess.dll`), loaded at runtime via [pythonnet](https://pythonnet.github.io/).
+
+The C# side uses [ILGPU](https://github.com/m4rs-mt/ILGPU), so it works over
+OpenCL (AMD / Intel / NVIDIA), CUDA (NVIDIA), or a CPU accelerator fallback
+if no GPU driver is found — no vendor-specific code needed.
+
+## Usage
+
+```python
+import cugpu
+
+cugpu.print_gpus()                      # list every accelerator found
+print(cugpu.active_device())            # which one compute calls use
+print(cugpu.vector_add([1, 2, 3], [4, 5, 6]))   # [5.0, 7.0, 9.0]
+```
+
+## Note
+
+This folder is only the Python side. It expects `GpuAccess.dll` (and its
+dependencies) to already be sitting in `cugpu/_native/`. That's done
+automatically by `build_package.bat` in the parent `GPU_factory` folder,
+which compiles the C# project first and copies the output here before
+building this wheel.

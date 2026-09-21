@@ -1,0 +1,10 @@
+{
+  "model_name": "Nova",
+  "total_steps": 1920,
+  "last_loss": 2.164388656616211,
+  "vocab_size": 101,
+  "saved_at": "2026-09-21 08:23:06",
+  "interrupted": false,
+  "fine_tuned": true,
+  "fine_tune_examples": 32
+}

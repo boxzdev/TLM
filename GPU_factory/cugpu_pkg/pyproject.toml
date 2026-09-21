@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cugpu"
+version = "0.1.0"
+description = "Python package that accesses the GPU through a C# / ILGPU backend"
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "pythonnet>=3.0.3",
+    "numpy"
+]
+
+[tool.setuptools]
+packages = ["cugpu"]
+
+[tool.setuptools.package-data]
+cugpu = ["_native/*.dll"]
