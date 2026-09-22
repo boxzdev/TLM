@@ -22,6 +22,7 @@ Run it with:
 import argparse
 import json
 import os
+import re
 import sys
 
 import numpy as np
@@ -152,10 +153,16 @@ def generate_reply(model, tokenizer, prompt_ids, max_new_tokens=200,
     return tokenizer.decode(generated_ids).rstrip()
 
 
+def normalize_prompt(text):
+    """Lowercase, drop punctuation, collapse spaces, so "Hello!!" and
+    "hello" become the same prompt."""
+    return " ".join(re.sub(r"[^\w' ]+", " ", text.lower()).split())
+
+
 def build_prompt(user_text, raw=False):
     if raw:
         return user_text
-    return f"User: {user_text}\nBot: "
+    return f"User: {normalize_prompt(user_text) or user_text}\nBot: "
 
 
 # ============================================================================
