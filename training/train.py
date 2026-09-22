@@ -14,19 +14,6 @@ the model, nothing more.
 
 Ctrl+C-safe: interrupting mid-epoch saves checkpoint.bin + train_meta.json
 exactly like reaching the end normally does, so you never lose progress.
-
-Learning-rate warmup: the architecture in architecture.py follows the
-classic Post-LN Transformer diagram (Add & Norm AFTER each sublayer,
-not before). Post-LN stacks are well known to be hard to optimize at
-depth if hit with the full learning rate from step one -- the gradient
-scale through several un-normalized residual adds early on can stall
-training entirely rather than just being slow. The fix (used by the
-original Transformer paper) is to ramp the learning rate up linearly
-over the first WARMUP_STEPS steps instead of applying it at full
-strength immediately. Optimizer state (Adam's moment estimates) isn't
-saved in checkpoint.bin, so every run of this script starts Adam fresh
--- warmup is applied at the start of every run, not just the very first
-one.
 """
 
 import importlib.util
@@ -41,15 +28,6 @@ TRAINING_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(TRAINING_DIR)
 FACTORY_DIR = os.path.join(PROJECT_ROOT, "factory")
 MODELS_DIR = os.path.join(PROJECT_ROOT, "models")
-
-WARMUP_STEPS = 300
-
-
-def lr_with_warmup(step, base_lr, warmup_steps=WARMUP_STEPS):
-    """Linear ramp from ~0 up to base_lr over warmup_steps, then flat."""
-    if step >= warmup_steps:
-        return base_lr
-    return base_lr * (step + 1) / warmup_steps
 
 sys.path.insert(0, FACTORY_DIR)
 from tokenizer import Tokenizer, find_data_files, load_corpus, list_models  # noqa: E402
@@ -73,6 +51,9 @@ def ask_model():
     models = list_models()
     if not models:
         sys.exit("No models found. Run factory_TLM.py first to create one.")
+    if len(models) == 1:
+        print(f"Using model: {models[0]}")
+        return models[0]
     print("Which model do you want to train?")
     for i, name in enumerate(models, 1):
         print(f"  {i}. {name}")
@@ -172,17 +153,21 @@ def train(model_name):
 
     resume = os.path.exists(checkpoint_path)
     if resume:
-        choice = input(f"Existing checkpoint found for '{model_name}'. Resume training? [Y/n] ").strip().lower()
-        if choice == "n":
-            confirm = input("  This restarts from scratch and discards current progress. Continue? [y/N] ").strip().lower()
-            if confirm != "y":
-                sys.exit("Cancelled.")
+        print(f"Existing checkpoint found for '{model_name}'.")
+        print("  1. Resume training")
+        print("  2. Start fresh (discards current progress)")
+        if input("> ").strip() == "2":
             resume = False
 
+    model = None
     if resume:
         model = architecture.TinyTransformer.load(checkpoint_path, device=config.DEVICE)
-        print(f"Resumed model ({model.total_params:,} params).")
-    else:
+        if model.vocab_size != tokenizer.vocab_size:
+            print("Vocab changed since the last checkpoint -- starting fresh.")
+            model, resume = None, False
+        else:
+            print(f"Resumed model ({model.total_params:,} params).")
+    if model is None:
         model = architecture.TinyTransformer(
             vocab_size=tokenizer.vocab_size,
             d_model=config.D_MODEL,
@@ -215,7 +200,6 @@ def train(model_name):
     print("\nTraining -- Ctrl+C any time to stop and save.\n")
 
     interrupted = False
-    local_step = 0
     try:
         for epoch in range(1, epochs + 1):
             order = list(range(len(chunks)))
@@ -224,9 +208,7 @@ def train(model_name):
             for step_i, idx in enumerate(order, 1):
                 inputs, targets = chunks[idx]
                 loss, grads = model.loss_and_grads(inputs, targets)
-                lr = lr_with_warmup(local_step, config.LEARNING_RATE)
-                local_step += 1
-                model.update(grads, learning_rate=lr)
+                model.update(grads, learning_rate=config.LEARNING_RATE)
                 epoch_loss += loss
                 total_steps += 1
                 last_loss = loss
@@ -234,7 +216,7 @@ def train(model_name):
                 if step_i % print_every == 0 or step_i == len(chunks):
                     avg = epoch_loss / step_i
                     print(f"  epoch {epoch}/{epochs}  step {step_i}/{len(chunks)}  "
-                          f"loss={loss:.3f}  avg={avg:.3f}  lr={lr:.5f}  total_steps={total_steps}")
+                          f"loss={loss:.3f}  avg={avg:.3f}  total_steps={total_steps}")
 
             sample = preview(model, tokenizer, rng)
             print(f"  [epoch {epoch} sample] {sample!r}\n")
