@@ -34,6 +34,7 @@ import glob
 import importlib.util
 import json
 import os
+import re
 import shutil
 import sys
 import time
@@ -47,7 +48,7 @@ MODELS_DIR = os.path.join(PROJECT_ROOT, "models")
 FINETUNE_DATA_DIR = os.path.join(PROJECT_ROOT, "finetune_data")
 
 sys.path.insert(0, FACTORY_DIR)
-from tokenizer import Tokenizer, list_models  # noqa: E402
+from tokenizer import Tokenizer, list_models, normalize_prompt  # noqa: E402
 
 DEFAULT_EPOCHS = 30
 DEFAULT_LEARNING_RATE = 0.0005  # lower than base training -- small data, easy to overfit
@@ -68,6 +69,9 @@ def ask_model():
     models = list_models()
     if not models:
         sys.exit("No models found. Run factory_TLM.py first to create one.")
+    if len(models) == 1:
+        print(f"Using model: {models[0]}")
+        return models[0]
     print("Which model do you want to fine-tune?")
     for i, name in enumerate(models, 1):
         print(f"  {i}. {name}")
@@ -113,6 +117,115 @@ def load_conversations(paths):
             if msgs:
                 conversations.append(msgs)
     return conversations
+
+
+# ============================================================================
+# Augmentation: normalize + reword + typos + "I don't understand" examples
+# ============================================================================
+
+PARAPHRASE_COPIES = 3   # extra reworded copies of every example
+TYPO_COPIES = 3         # extra copies with random typos in the prompt
+NEGATIVE_RATIO = 0.15   # share of "I don't understand" examples
+NEGATIVE_ANSWER = "Sorry, I don't understand."
+
+REWORDS = {
+    "hello": ["hi", "hey", "hello there", "hiya"],
+    "hi": ["hello", "hey", "hi there"],
+    "hey": ["hi", "hello"],
+    "how are you": ["how are you doing", "how r u", "hows it going", "how are you today"],
+    "who are you": ["what are you", "tell me who you are", "what is your name"],
+    "what is your name": ["whats your name", "who are you", "what are you called"],
+    "thanks": ["thank you", "thx", "many thanks"],
+    "bye": ["goodbye", "see you", "see ya"],
+}
+FILLERS_BEFORE = ["hey", "so", "ok", "um", "please", "tell me"]
+FILLERS_AFTER = ["please", "bot", "buddy"]
+OFFTOPIC = [
+    "what is the capital of france", "how do i bake a cake", "who won the game last night",
+    "what is the weather like", "how far is the moon", "explain quantum physics",
+    "translate this to spanish", "what time is it", "what is the meaning of life",
+]
+LETTERS = "abcdefghijklmnopqrstuvwxyz"
+
+
+def reword(q, rng):
+    for key in sorted(REWORDS, key=len, reverse=True):
+        pat = rf"\b{re.escape(key)}\b"
+        if re.search(pat, q):
+            choice = str(rng.choice(REWORDS[key]))
+            q = re.sub(pat, lambda m: choice, q, count=1)
+            break
+    r = rng.random()
+    if r < 0.3:
+        q = f"{rng.choice(FILLERS_BEFORE)} {q}"
+    elif r < 0.5:
+        q = f"{q} {rng.choice(FILLERS_AFTER)}"
+    return q
+
+
+def add_typos(text, rng, rate=0.06):
+    result = text
+    for _ in range(5):  # retry so short prompts still get changed
+        chars, out, i = list(text), [], 0
+        while i < len(chars):
+            c, r = chars[i], rng.random()
+            if c == " " or r > rate:
+                out.append(c)
+            elif r < rate / 4:
+                pass                                   # drop a letter
+            elif r < rate / 2:
+                out.extend([c, c])                     # doubled letter
+            elif r < 3 * rate / 4 and i + 1 < len(chars):
+                out.extend([chars[i + 1], c])          # swapped letters
+                i += 1
+            else:
+                out.append(str(rng.choice(list(LETTERS))))  # wrong letter
+            i += 1
+        result = "".join(out).strip() or text
+        if result != text:
+            break
+    return result
+
+
+def make_negatives(real_prompts, n, rng):
+    known = set(real_prompts)
+    words = sorted({w for p in real_prompts for w in p.split()})
+    negs, tries = [], 0
+    while len(negs) < n and tries < n * 20:
+        tries += 1
+        kind = int(rng.integers(3))
+        if kind == 0:    # keyboard mash
+            s = "".join(rng.choice(list(LETTERS), int(rng.integers(3, 15))))
+        elif kind == 1 and words:   # word salad from the real prompts
+            s = " ".join(rng.choice(words, int(rng.integers(2, 5))))
+        else:            # unrelated question
+            s = str(rng.choice(OFFTOPIC))
+        s = normalize_prompt(s)
+        if s and s not in known:
+            negs.append(s)
+    return negs
+
+
+def augment(conversations, rng):
+    """Returns (augmented conversations, number of 'I don't understand' ones)."""
+    def transform(msgs, fn):
+        return [dict(m, content=fn(m["content"])) if m.get("role") == "user" else m
+                for m in msgs]
+
+    out, real_prompts = [], []
+    for msgs in conversations:
+        real_prompts += [normalize_prompt(m["content"]) for m in msgs if m.get("role") == "user"]
+        out.append(transform(msgs, normalize_prompt))
+        for _ in range(PARAPHRASE_COPIES):
+            out.append(transform(msgs, lambda q: reword(normalize_prompt(q), rng)))
+        for _ in range(TYPO_COPIES):
+            out.append(transform(msgs, lambda q: add_typos(normalize_prompt(q), rng)))
+
+    n_neg = int(len(out) * NEGATIVE_RATIO / (1 - NEGATIVE_RATIO))
+    for s in make_negatives(real_prompts, n_neg, rng):
+        out.append([{"role": "user", "content": s},
+                    {"role": "assistant", "content": NEGATIVE_ANSWER}])
+    return out, len(out) - len(conversations) * (1 + PARAPHRASE_COPIES + TYPO_COPIES)
 
 
 def build_examples(conversations, tokenizer, max_seq_len):
@@ -210,6 +323,10 @@ def finetune(model_name):
     print(f"Backed up pre-finetune weights to {backup_path}")
 
     conversations = load_conversations(finetune_files)
+    n_orig = len(conversations)
+    conversations, n_neg = augment(conversations, np.random.default_rng())
+    print(f"Augmented {n_orig} conversations -> {len(conversations)} examples "
+          f"(rewords, typos, {n_neg} 'I don't understand').")
     examples, skipped = build_examples(conversations, tokenizer, model.max_seq_len)
     if not examples:
         sys.exit("No usable examples after processing finetune_data/. Check the format.")
