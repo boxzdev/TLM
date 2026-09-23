@@ -285,6 +285,33 @@ def build_examples(conversations, tokenizer, max_seq_len):
     return examples, skipped
 
 
+def pad_batch(examples, idxs, pad_id):
+    """Fine-tune examples are variable-length (conversations differ in
+    length), unlike train.py's fixed-size chunks -- so batching them
+    means padding every example in the batch up to the longest one.
+    Padded positions get pad_id in inputs/targets and 0 in loss_mask,
+    so they're excluded from the loss exactly like the scaffolding text
+    ("User: ...\\nBot: ") already is."""
+    batch = [examples[i] for i in idxs]
+    max_len = max(len(inp) for inp, _, _ in batch)
+    B = len(batch)
+    inputs = np.full((B, max_len), pad_id, dtype=np.int64)
+    targets = np.full((B, max_len), pad_id, dtype=np.int64)
+    mask = np.zeros((B, max_len), dtype=np.float32)
+    for b, (inp, tgt, m) in enumerate(batch):
+        L = len(inp)
+        inputs[b, :L] = inp
+        targets[b, :L] = tgt
+        mask[b, :L] = m
+    return inputs, targets, mask
+
+
+def batch_iter(examples, order, batch_size, pad_id):
+    for start in range(0, len(order), batch_size):
+        idxs = order[start:start + batch_size]
+        yield pad_batch(examples, idxs, pad_id)
+
+
 # ============================================================================
 # Fine-tuning
 # ============================================================================
@@ -334,6 +361,8 @@ def finetune(model_name):
           f"{f' ({skipped} skipped)' if skipped else ''}.")
 
     epochs = ask_epochs(DEFAULT_EPOCHS)
+    batch_size = max(1, getattr(config, "BATCH_SIZE", 16))
+    pad_id = tokenizer.pad_id if tokenizer.pad_id is not None else 0
     rng = np.random.default_rng()
 
     print("\nFine-tuning -- Ctrl+C any time to stop and save.\n")
@@ -346,18 +375,22 @@ def finetune(model_name):
             order = list(range(len(examples)))
             rng.shuffle(order)
             epoch_loss = 0.0
-            active_tokens = 0
-            for idx in order:
-                input_ids, target_ids, loss_mask = examples[idx]
+            n_batches = 0
+            for input_ids, target_ids, loss_mask in batch_iter(examples, order, batch_size, pad_id):
+                # loss is already a mean over that batch's valid (non-padded,
+                # non-masked) tokens -- see architecture.py -- so averaging
+                # it further just means averaging the per-batch means below,
+                # not dividing by a raw token count like this used to.
                 loss, grads = model.loss_and_grads(input_ids, target_ids, loss_mask=loss_mask)
                 model.update(grads, learning_rate=DEFAULT_LEARNING_RATE)
                 epoch_loss += loss
-                active_tokens += max(int(loss_mask.sum()), 1)
+                n_batches += 1
                 total_steps += 1
                 last_loss = loss
 
-            avg = epoch_loss / active_tokens
-            print(f"  epoch {epoch}/{epochs}  avg loss/answer-char={avg:.3f}  total_steps={total_steps}")
+            avg = epoch_loss / max(n_batches, 1)
+            print(f"  epoch {epoch}/{epochs}  avg loss={avg:.3f}  "
+                  f"batches={n_batches}  total_steps={total_steps}")
 
     except KeyboardInterrupt:
         interrupted = True
