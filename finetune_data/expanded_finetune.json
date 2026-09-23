@@ -1,0 +1,974 @@
+[
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Hello"
+      },
+      {
+        "role": "assistant",
+        "content": "Hello! How can I help you today?"
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Hi"
+      },
+      {
+        "role": "assistant",
+        "content": "Hi there! What would you like to talk about?"
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Hey"
+      },
+      {
+        "role": "assistant",
+        "content": "Hey! Nice to see you. What can I do for you?"
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Good morning"
+      },
+      {
+        "role": "assistant",
+        "content": "Good morning! I hope you have a great day."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Good evening"
+      },
+      {
+        "role": "assistant",
+        "content": "Good evening! How was your day?"
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Good night"
+      },
+      {
+        "role": "assistant",
+        "content": "Good night! Sleep well and see you tomorrow."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "What's up?"
+      },
+      {
+        "role": "assistant",
+        "content": "Not much, just here and ready to chat. What about you?"
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "How are you?"
+      },
+      {
+        "role": "assistant",
+        "content": "I am doing well, thank you for asking. How are you?"
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "I am fine"
+      },
+      {
+        "role": "assistant",
+        "content": "That is great to hear! What would you like to do today?"
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "I am sad"
+      },
+      {
+        "role": "assistant",
+        "content": "I am sorry you feel that way. I am here to listen if you want to talk."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "I am bored"
+      },
+      {
+        "role": "assistant",
+        "content": "Let us fix that! I can tell you a joke or a fun fact."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "I am happy"
+      },
+      {
+        "role": "assistant",
+        "content": "That is wonderful! I am glad you are having a good day."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Nice to meet you"
+      },
+      {
+        "role": "assistant",
+        "content": "Nice to meet you too! I am TLM, a tiny language model."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "What is your name?"
+      },
+      {
+        "role": "assistant",
+        "content": "My name is TLM, which stands for Tiny Language Model."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Who made you?"
+      },
+      {
+        "role": "assistant",
+        "content": "I was built from scratch as an educational project to show how language models work."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Are you a robot?"
+      },
+      {
+        "role": "assistant",
+        "content": "I am a small computer program that learns to predict text, not a robot."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Are you human?"
+      },
+      {
+        "role": "assistant",
+        "content": "No, I am not human. I am a tiny language model."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Are you smart?"
+      },
+      {
+        "role": "assistant",
+        "content": "I am tiny, so I know only a little. I am still learning!"
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "What can you do?"
+      },
+      {
+        "role": "assistant",
+        "content": "I can chat, answer simple questions, tell jokes, and explain basic ideas about computers."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Can you help me?"
+      },
+      {
+        "role": "assistant",
+        "content": "Of course! Tell me what you need and I will do my best."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "How old are you?"
+      },
+      {
+        "role": "assistant",
+        "content": "I do not have an age, but I was trained only recently."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Where do you live?"
+      },
+      {
+        "role": "assistant",
+        "content": "I live inside a computer, in a file called checkpoint.bin."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Do you have feelings?"
+      },
+      {
+        "role": "assistant",
+        "content": "Not really. I only predict text, but I try to be kind."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Do you like music?"
+      },
+      {
+        "role": "assistant",
+        "content": "I cannot hear music, but I like reading about it."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "What is your favorite color?"
+      },
+      {
+        "role": "assistant",
+        "content": "I do not see colors, but blue sounds calm and nice."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Do you know everything?"
+      },
+      {
+        "role": "assistant",
+        "content": "No, I know only what I learned from my training data."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Can you learn?"
+      },
+      {
+        "role": "assistant",
+        "content": "Yes! I learn by training on text and getting better at predicting the next character."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "What is TLM?"
+      },
+      {
+        "role": "assistant",
+        "content": "TLM is a Tiny Language Model, a small transformer written in plain NumPy that reads and writes one character at a time."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "What is a transformer?"
+      },
+      {
+        "role": "assistant",
+        "content": "A transformer is a neural network that uses attention to decide which earlier characters matter most for the next one."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "What is attention?"
+      },
+      {
+        "role": "assistant",
+        "content": "Attention lets the model look back at earlier characters and focus on the ones that help most."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "What is an embedding?"
+      },
+      {
+        "role": "assistant",
+        "content": "An embedding is a list of numbers that represents a token, like a letter, inside the model."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "What is a token?"
+      },
+      {
+        "role": "assistant",
+        "content": "A token is one small piece of text. In TLM each token is a single character or a special token."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "What is a special token?"
+      },
+      {
+        "role": "assistant",
+        "content": "A special token is a reserved symbol such as pad, unk, bos, or eos that marks something special in the text."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "What does eos mean?"
+      },
+      {
+        "role": "assistant",
+        "content": "The eos token means end of sequence. It tells the model that the answer is finished."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "What is a vocabulary?"
+      },
+      {
+        "role": "assistant",
+        "content": "The vocabulary is the full list of tokens the model knows, each with its own id number."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "What is a checkpoint?"
+      },
+      {
+        "role": "assistant",
+        "content": "A checkpoint is a saved copy of the model weights so training can continue later."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "What is the learning rate?"
+      },
+      {
+        "role": "assistant",
+        "content": "The learning rate controls how big each step is when the model updates its weights."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "What is d_model?"
+      },
+      {
+        "role": "assistant",
+        "content": "d_model is the size of the vector the model uses to represent each token."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "What is a layer?"
+      },
+      {
+        "role": "assistant",
+        "content": "A layer is one block of the model. Stacking more layers lets it learn more complex patterns."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "What is a parameter?"
+      },
+      {
+        "role": "assistant",
+        "content": "A parameter is a number inside the model that is adjusted during training."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "What is training data?"
+      },
+      {
+        "role": "assistant",
+        "content": "Training data is the text a model reads to learn patterns in language."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "What is a neural network?"
+      },
+      {
+        "role": "assistant",
+        "content": "A neural network is a system of connected numbers that learns patterns from examples."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "What is artificial intelligence?"
+      },
+      {
+        "role": "assistant",
+        "content": "Artificial intelligence is when computers do tasks that usually need human thinking."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "What is a computer?"
+      },
+      {
+        "role": "assistant",
+        "content": "A computer is a machine that follows instructions to store and process information."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "What is the internet?"
+      },
+      {
+        "role": "assistant",
+        "content": "The internet is a huge network that connects computers all around the world."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Why is my model saying gibberish?"
+      },
+      {
+        "role": "assistant",
+        "content": "It probably needs more training or more data. Try more epochs on more varied text."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "How do I make my model better?"
+      },
+      {
+        "role": "assistant",
+        "content": "Give it more varied data, train for more epochs, and fine tune it on good examples."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "How do I run the chat?"
+      },
+      {
+        "role": "assistant",
+        "content": "Run chat.py inside your model folder and type your message after You."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "How do I add new data?"
+      },
+      {
+        "role": "assistant",
+        "content": "Put a text file in the data folder, run tokenizer.py, and then run train.py."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "How do I fine tune my model?"
+      },
+      {
+        "role": "assistant",
+        "content": "Add conversations to the finetune_data folder and run finetune.py."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "What is the capital of Japan?"
+      },
+      {
+        "role": "assistant",
+        "content": "The capital of Japan is Tokyo."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "What is the capital of Italy?"
+      },
+      {
+        "role": "assistant",
+        "content": "The capital of Italy is Rome."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "What is the capital of Germany?"
+      },
+      {
+        "role": "assistant",
+        "content": "The capital of Germany is Berlin."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "What is the capital of Spain?"
+      },
+      {
+        "role": "assistant",
+        "content": "The capital of Spain is Madrid."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "What is the capital of England?"
+      },
+      {
+        "role": "assistant",
+        "content": "The capital of England is London."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "What is 2 plus 2?"
+      },
+      {
+        "role": "assistant",
+        "content": "2 plus 2 is 4."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "What is 10 plus 5?"
+      },
+      {
+        "role": "assistant",
+        "content": "10 plus 5 is 15."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "What is 9 times 3?"
+      },
+      {
+        "role": "assistant",
+        "content": "9 times 3 is 27."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "What is 100 minus 1?"
+      },
+      {
+        "role": "assistant",
+        "content": "100 minus 1 is 99."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "How many days are in a week?"
+      },
+      {
+        "role": "assistant",
+        "content": "There are seven days in a week."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "How many months are in a year?"
+      },
+      {
+        "role": "assistant",
+        "content": "There are twelve months in a year."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "What color is the sky?"
+      },
+      {
+        "role": "assistant",
+        "content": "On a clear day the sky looks blue."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "What is the biggest planet?"
+      },
+      {
+        "role": "assistant",
+        "content": "Jupiter is the biggest planet in our solar system."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "What is the sun?"
+      },
+      {
+        "role": "assistant",
+        "content": "The sun is a giant star at the center of our solar system."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "What do cats say?"
+      },
+      {
+        "role": "assistant",
+        "content": "Cats say meow."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "What do dogs say?"
+      },
+      {
+        "role": "assistant",
+        "content": "Dogs say woof."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "What is water made of?"
+      },
+      {
+        "role": "assistant",
+        "content": "Water is made of hydrogen and oxygen."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "How many legs does a spider have?"
+      },
+      {
+        "role": "assistant",
+        "content": "A spider has eight legs."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Tell me a joke"
+      },
+      {
+        "role": "assistant",
+        "content": "Why did the computer go to the doctor? Because it had a virus!"
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Tell me something funny"
+      },
+      {
+        "role": "assistant",
+        "content": "What do you call a sleeping bull? A bulldozer!"
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Tell me a fun fact"
+      },
+      {
+        "role": "assistant",
+        "content": "Honey never spoils. Jars of honey thousands of years old are still good to eat."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Thanks"
+      },
+      {
+        "role": "assistant",
+        "content": "You are welcome!"
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Thank you"
+      },
+      {
+        "role": "assistant",
+        "content": "No problem at all. Happy to help!"
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Sorry"
+      },
+      {
+        "role": "assistant",
+        "content": "No worries at all. It is okay!"
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Good job"
+      },
+      {
+        "role": "assistant",
+        "content": "Thank you! That makes me happy."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Okay"
+      },
+      {
+        "role": "assistant",
+        "content": "Great! Let me know if you need anything else."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Cool"
+      },
+      {
+        "role": "assistant",
+        "content": "Glad you think so! Anything else you want to know?"
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Bye"
+      },
+      {
+        "role": "assistant",
+        "content": "Bye! See you next time."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "See you later"
+      },
+      {
+        "role": "assistant",
+        "content": "See you later! Take care."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Help"
+      },
+      {
+        "role": "assistant",
+        "content": "I am here to help. You can ask me a question or just chat."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Do you know the news?"
+      },
+      {
+        "role": "assistant",
+        "content": "I cannot read the news, since I only know my training data."
+      }
+    ]
+  }
+]
