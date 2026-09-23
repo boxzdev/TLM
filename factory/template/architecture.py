@@ -242,7 +242,7 @@ class MultiHeadAttention:
         Qh, Kh, Vh = self._split_heads(Q), self._split_heads(K), self._split_heads(V)
 
         scores = xp.einsum('htd,hsd->hts', Qh, Kh) / math.sqrt(self.d_head)
-        scores = xp.where(causal_mask[None, :, :], scores, -1e9)
+        scores = xp.where(causal_mask[None, :, :], scores, xp.float32(-1e9))
         attn = softmax(scores, axis=-1, xp=xp)               # (H, T, T)
         context = xp.einsum('hts,hsd->htd', attn, Vh)         # (H, T, Dh)
         merged = self._merge_heads(context)                  # (T, D)
@@ -580,7 +580,9 @@ class TinyTransformer:
             probs = softmax(last_logits, xp=self.xp)
             # Sampling a single vocab-sized vector is cheap, so it always
             # runs on the host -- avoids needing CuPy's own RNG API.
-            next_id = rng.choice(self.vocab_size, p=to_host(probs))
+            p = to_host(probs).astype(np.float64)
+            p /= p.sum()
+            next_id = rng.choice(self.vocab_size, p=p)
             ids.append(int(next_id))
         return ids
 
