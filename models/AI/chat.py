@@ -35,7 +35,14 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_CHECKPOINT = os.path.join(SCRIPT_DIR, "checkpoint.bin")
 DEFAULT_VOCAB = os.path.join(SCRIPT_DIR, "tokenize_vocab.json")
 
-STOP_STRINGS = ["\nUser:", "User:", "\nHuman:", "<eos>"]
+# Every fine-tune answer ends "...answer\n<eos>", and in practice the
+# model reaches that newline reliably (it's one token before <eos> in
+# every generation we measured), but wanders for a long, unpredictable
+# number of tokens past a finished answer before choosing to emit it.
+# Cutting at the first newline gets the same stop point the model was
+# already heading for, just without the wait -- not a workaround, it's
+# reading the same signal earlier.
+STOP_STRINGS = ["\n", "User:", "\nHuman:", "<eos>"]
 
 
 # ============================================================================
@@ -190,7 +197,7 @@ def main():
     parser.add_argument("--checkpoint", default=DEFAULT_CHECKPOINT)
     parser.add_argument("--vocab", default=DEFAULT_VOCAB)
     parser.add_argument("--device", default="cpu", choices=["cpu", "gpu"])
-    parser.add_argument("--max-tokens", type=int, default=200)
+    parser.add_argument("--max-tokens", type=int, default=60)
     parser.add_argument("--temperature", type=float, default=0.8)
     parser.add_argument("--raw", action="store_true",
                          help="Skip the User:/Bot: chat template (raw base-model completion).")
