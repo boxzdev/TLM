@@ -123,6 +123,7 @@ def create_model(name, arch, device):
         "__MAX_SEQ_LEN__": str(arch["max_seq_len"]),
         "__DEVICE__": device,
         "__SEQ_LENGTH__": str(min(arch["max_seq_len"], 64)),
+        "__BATCH_SIZE__": "16",
         "__LEARNING_RATE__": "0.001",
         "__EPOCHS__": "10",
     }
