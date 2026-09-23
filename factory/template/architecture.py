@@ -71,6 +71,25 @@ def is_cugpu_available():
         return False
 
 
+def to_host(x):
+    """Bring an array back to NumPy on the CPU -- a no-op if it's already
+    NumPy. Used for the few things that must run on the host regardless
+    of backend: RNG sampling and writing checkpoint bytes to disk."""
+    return x.get() if hasattr(x, "get") else x
+
+
+def scatter_add(xp, dest, indices, values):
+    """dest[indices] += values, accumulating duplicate indices (what
+    NumPy's np.add.at does for the embedding gradient). CuPy has no
+    ufunc.at, so it uses cupyx.scatter_add instead -- same result,
+    GPU-compatible."""
+    if xp is np:
+        np.add.at(dest, indices, values)
+    else:
+        import cupyx
+        cupyx.scatter_add(dest, indices, values)
+
+
 def get_array_module(device="cpu"):
     """Returns the array backend to compute with. 'cugpu' currently routes
     through NumPy here (cugpu exposes individual numpy-in/numpy-out ops
@@ -121,49 +140,49 @@ def xavier(rng, shape):
     return rng.uniform(-limit, limit, size=shape).astype(np.float32)
 
 
-def softmax(x, axis=-1):
-    x = x - np.max(x, axis=axis, keepdims=True)
-    e = np.exp(x)
-    return e / np.sum(e, axis=axis, keepdims=True)
+def softmax(x, axis=-1, xp=np):
+    x = x - xp.max(x, axis=axis, keepdims=True)
+    e = xp.exp(x)
+    return e / xp.sum(e, axis=axis, keepdims=True)
 
 
-def gelu(x):
+def gelu(x, xp=np):
     """tanh-approximation GELU, same one GPT-2 uses."""
     c = math.sqrt(2.0 / math.pi)
-    return 0.5 * x * (1.0 + np.tanh(c * (x + 0.044715 * x ** 3)))
+    return 0.5 * x * (1.0 + xp.tanh(c * (x + 0.044715 * x ** 3)))
 
 
-def gelu_backward(x, dout):
+def gelu_backward(x, dout, xp=np):
     c = math.sqrt(2.0 / math.pi)
     x3 = x ** 3
     inner = c * (x + 0.044715 * x3)
-    t = np.tanh(inner)
+    t = xp.tanh(inner)
     sech2 = 1.0 - t * t
     dinner_dx = c * (1.0 + 3.0 * 0.044715 * x ** 2)
     dgelu_dx = 0.5 * (1.0 + t) + 0.5 * x * sech2 * dinner_dx
     return dout * dgelu_dx
 
 
-def layer_norm_forward(x, gamma, beta, eps=1e-5):
+def layer_norm_forward(x, gamma, beta, eps=1e-5, xp=np):
     mu = x.mean(axis=-1, keepdims=True)
     var = x.var(axis=-1, keepdims=True)
-    std_inv = 1.0 / np.sqrt(var + eps)
+    std_inv = 1.0 / xp.sqrt(var + eps)
     xhat = (x - mu) * std_inv
     out = gamma * xhat + beta
     cache = (xhat, std_inv, gamma)
     return out, cache
 
 
-def layer_norm_backward(dout, cache):
+def layer_norm_backward(dout, cache, xp=np):
     xhat, std_inv, gamma = cache
     N = dout.shape[-1]
-    dgamma = np.sum(dout * xhat, axis=tuple(range(dout.ndim - 1)))
-    dbeta = np.sum(dout, axis=tuple(range(dout.ndim - 1)))
+    dgamma = xp.sum(dout * xhat, axis=tuple(range(dout.ndim - 1)))
+    dbeta = xp.sum(dout, axis=tuple(range(dout.ndim - 1)))
     dxhat = dout * gamma
     dx = std_inv / N * (
         N * dxhat
-        - np.sum(dxhat, axis=-1, keepdims=True)
-        - xhat * np.sum(dxhat * xhat, axis=-1, keepdims=True)
+        - xp.sum(dxhat, axis=-1, keepdims=True)
+        - xhat * xp.sum(dxhat * xhat, axis=-1, keepdims=True)
     )
     return dx, dgamma, dbeta
 
@@ -185,28 +204,17 @@ def sinusoidal_positional_encoding(max_len, d_model):
 # ============================================================================
 
 class MultiHeadAttention:
-    def __init__(self, d_model, num_heads, rng, num_layers=1):
+    def __init__(self, d_model, num_heads, rng, xp=np):
         assert d_model % num_heads == 0, "d_model must be divisible by num_heads"
         self.d_model = d_model
         self.num_heads = num_heads
         self.d_head = d_model // num_heads
+        self.xp = xp
 
         self.Wq = xavier(rng, (d_model, d_model))
         self.Wk = xavier(rng, (d_model, d_model))
         self.Wv = xavier(rng, (d_model, d_model))
-        # Wo feeds straight into the residual add. In this Post-LN stack
-        # (Add & Norm AFTER the sublayer, per the architecture diagram)
-        # the residual stream is never renormalized until after it's been
-        # added to, so each block's contribution compounds across depth --
-        # with plain Xavier init, a handful of layers is enough for the
-        # signal reaching early blocks to blow up and gradients to those
-        # blocks to vanish, and training silently collapses to predicting
-        # each token's raw unconditional frequency (measurably verified:
-        # its loss plateau lands exactly on the corpus's zero-context
-        # character entropy). Scaling Wo by 1/sqrt(2*num_layers) at init
-        # (the fix GPT-2 uses to make deep Post-LN-style stacks trainable)
-        # keeps that compounding bounded regardless of depth.
-        self.Wo = xavier(rng, (d_model, d_model)) / math.sqrt(2 * num_layers)
+        self.Wo = xavier(rng, (d_model, d_model))
         self.bq = np.zeros(d_model, dtype=np.float32)
         self.bk = np.zeros(d_model, dtype=np.float32)
         self.bv = np.zeros(d_model, dtype=np.float32)
@@ -230,12 +238,13 @@ class MultiHeadAttention:
         K = x @ self.Wk + self.bk
         V = x @ self.Wv + self.bv
 
+        xp = self.xp
         Qh, Kh, Vh = self._split_heads(Q), self._split_heads(K), self._split_heads(V)
 
-        scores = np.einsum('htd,hsd->hts', Qh, Kh) / math.sqrt(self.d_head)
-        scores = np.where(causal_mask[None, :, :], scores, -1e9)
-        attn = softmax(scores, axis=-1)                     # (H, T, T)
-        context = np.einsum('hts,hsd->htd', attn, Vh)        # (H, T, Dh)
+        scores = xp.einsum('htd,hsd->hts', Qh, Kh) / math.sqrt(self.d_head)
+        scores = xp.where(causal_mask[None, :, :], scores, -1e9)
+        attn = softmax(scores, axis=-1, xp=xp)               # (H, T, T)
+        context = xp.einsum('hts,hsd->htd', attn, Vh)         # (H, T, Dh)
         merged = self._merge_heads(context)                  # (T, D)
         out = merged @ self.Wo + self.bo
 
@@ -246,20 +255,21 @@ class MultiHeadAttention:
         x, Qh, Kh, Vh = cache['x'], cache['Qh'], cache['Kh'], cache['Vh']
         attn, merged = cache['attn'], cache['merged']
 
+        xp = self.xp
         dWo = merged.T @ dout
         dbo = dout.sum(axis=0)
         dmerged = dout @ self.Wo.T
         dcontext = self._split_heads(dmerged)                # (H, T, Dh)
 
-        dattn = np.einsum('htd,hsd->hts', dcontext, Vh)       # (H, T, T)
-        dVh = np.einsum('hts,htd->hsd', attn, dcontext)       # (H, T, Dh)
+        dattn = xp.einsum('htd,hsd->hts', dcontext, Vh)       # (H, T, T)
+        dVh = xp.einsum('hts,htd->hsd', attn, dcontext)       # (H, T, Dh)
 
         # softmax backward (per row, over the last axis)
-        dscores = attn * (dattn - np.sum(dattn * attn, axis=-1, keepdims=True))
+        dscores = attn * (dattn - xp.sum(dattn * attn, axis=-1, keepdims=True))
         dscores = dscores / math.sqrt(self.d_head)
 
-        dQh = np.einsum('hts,hsd->htd', dscores, Kh)
-        dKh = np.einsum('hts,htd->hsd', dscores, Qh)
+        dQh = xp.einsum('hts,hsd->htd', dscores, Kh)
+        dKh = xp.einsum('hts,htd->hsd', dscores, Qh)
 
         dQ = self._merge_heads(dQh)
         dK = self._merge_heads(dKh)
@@ -281,12 +291,11 @@ class MultiHeadAttention:
 # ============================================================================
 
 class FeedForward:
-    def __init__(self, d_model, d_ff, rng, num_layers=1):
+    def __init__(self, d_model, d_ff, rng, xp=np):
+        self.xp = xp
         self.W1 = xavier(rng, (d_model, d_ff))
         self.b1 = np.zeros(d_ff, dtype=np.float32)
-        # Same reasoning as MultiHeadAttention.Wo above -- W2 also feeds
-        # straight into the residual add.
-        self.W2 = xavier(rng, (d_ff, d_model)) / math.sqrt(2 * num_layers)
+        self.W2 = xavier(rng, (d_ff, d_model))
         self.b2 = np.zeros(d_model, dtype=np.float32)
 
     def params(self):
@@ -294,7 +303,7 @@ class FeedForward:
 
     def forward(self, x):
         h_pre = x @ self.W1 + self.b1
-        h = gelu(h_pre)
+        h = gelu(h_pre, xp=self.xp)
         out = h @ self.W2 + self.b2
         cache = dict(x=x, h_pre=h_pre, h=h)
         return out, cache
@@ -304,7 +313,7 @@ class FeedForward:
         dW2 = h.T @ dout
         db2 = dout.sum(axis=0)
         dh = dout @ self.W2.T
-        dh_pre = gelu_backward(h_pre, dh)
+        dh_pre = gelu_backward(h_pre, dh, xp=self.xp)
         dW1 = x.T @ dh_pre
         db1 = dh_pre.sum(axis=0)
         dx = dh_pre @ self.W1.T
@@ -317,9 +326,10 @@ class FeedForward:
 # ============================================================================
 
 class DecoderBlock:
-    def __init__(self, d_model, num_heads, d_ff, rng, num_layers=1):
-        self.attn = MultiHeadAttention(d_model, num_heads, rng, num_layers=num_layers)
-        self.ffn = FeedForward(d_model, d_ff, rng, num_layers=num_layers)
+    def __init__(self, d_model, num_heads, d_ff, rng, xp=np):
+        self.xp = xp
+        self.attn = MultiHeadAttention(d_model, num_heads, rng, xp=xp)
+        self.ffn = FeedForward(d_model, d_ff, rng, xp=xp)
         self.gamma1 = np.ones(d_model, dtype=np.float32)
         self.beta1 = np.zeros(d_model, dtype=np.float32)
         self.gamma2 = np.ones(d_model, dtype=np.float32)
@@ -335,24 +345,24 @@ class DecoderBlock:
     def forward(self, x, causal_mask):
         attn_out, attn_cache = self.attn.forward(x, causal_mask)
         res1 = x + attn_out                                  # Add
-        norm1, ln1_cache = layer_norm_forward(res1, self.gamma1, self.beta1)  # Norm
+        norm1, ln1_cache = layer_norm_forward(res1, self.gamma1, self.beta1, xp=self.xp)  # Norm
 
         ffn_out, ffn_cache = self.ffn.forward(norm1)
         res2 = norm1 + ffn_out                                # Add
-        norm2, ln2_cache = layer_norm_forward(res2, self.gamma2, self.beta2)  # Norm
+        norm2, ln2_cache = layer_norm_forward(res2, self.gamma2, self.beta2, xp=self.xp)  # Norm
 
         cache = dict(attn_cache=attn_cache, ln1_cache=ln1_cache,
                      ffn_cache=ffn_cache, ln2_cache=ln2_cache)
         return norm2, cache
 
     def backward(self, dout, cache):
-        dres2, dgamma2, dbeta2 = layer_norm_backward(dout, cache['ln2_cache'])
+        dres2, dgamma2, dbeta2 = layer_norm_backward(dout, cache['ln2_cache'], xp=self.xp)
         dnorm1_from_res2 = dres2                              # Add: splits equally
         dffn_out = dres2
         dnorm1_from_ffn, ffn_grads = self.ffn.backward(dffn_out, cache['ffn_cache'])
         dnorm1 = dnorm1_from_res2 + dnorm1_from_ffn
 
-        dres1, dgamma1, dbeta1 = layer_norm_backward(dnorm1, cache['ln1_cache'])
+        dres1, dgamma1, dbeta1 = layer_norm_backward(dnorm1, cache['ln1_cache'], xp=self.xp)
         dx_from_res1 = dres1                                  # Add: splits equally
         dattn_out = dres1
         dx_from_attn, attn_grads = self.attn.backward(dattn_out, cache['attn_cache'])
@@ -416,7 +426,7 @@ class TinyTransformer:
         self.pos_encoding = sinusoidal_positional_encoding(max_seq_len, d_model)
 
         # Nx decoder blocks
-        self.blocks = [DecoderBlock(d_model, num_heads, self.d_ff, rng, num_layers=num_layers)
+        self.blocks = [DecoderBlock(d_model, num_heads, self.d_ff, rng, xp=self.xp)
                         for _ in range(num_layers)]
 
         # Final Linear -> Softmax head
@@ -431,9 +441,18 @@ class TinyTransformer:
         self.total_params = calculate_model_parameters(
             d_model, vocab_size, num_layers, num_heads, self.d_ff)
 
+        # All weights above were built with plain NumPy (deterministic,
+        # seedable). Move every one to the selected backend now, once,
+        # rather than threading GPU-vs-CPU array creation through every
+        # xavier()/zeros() call above.
+        if self.xp is not np:
+            self.pos_encoding = self.xp.asarray(self.pos_encoding)
+            for name, arr in self.params().items():
+                self._set_param(name, self.xp.asarray(arr))
+
     # ------------------------------------------------------------------
     def _causal_mask(self, T):
-        return np.tril(np.ones((T, T), dtype=bool))
+        return self.xp.tril(self.xp.ones((T, T), dtype=bool))
 
     def params(self):
         p = {"embedding": self.embedding, "Wout": self.Wout, "bout": self.bout}
@@ -460,6 +479,7 @@ class TinyTransformer:
         """input_ids: 1D array of token ids, length T. Returns logits (T,V)
         and a cache list needed for the backward pass."""
         T = len(input_ids)
+        input_ids = self.xp.asarray(input_ids)
         x = self.embedding[input_ids] + self.pos_encoding[:T]
         mask = self._causal_mask(T)
 
@@ -469,7 +489,7 @@ class TinyTransformer:
             block_caches.append(cache)
 
         logits = x @ self.Wout + self.bout                   # Linear
-        probs = softmax(logits, axis=-1)                      # Softmax
+        probs = softmax(logits, axis=-1, xp=self.xp)          # Softmax
 
         cache = dict(input_ids=input_ids, x_final=x, probs=probs,
                      block_caches=block_caches)
@@ -486,22 +506,25 @@ class TinyTransformer:
         not on the user's question or prompt scaffolding. Defaults to all
         1s (every position counts) -- exactly the old unmasked behavior
         train.py already relies on, so this is fully backward-compatible."""
+        xp = self.xp
         T = len(input_ids)
         logits, probs, cache = self.forward(input_ids)
 
         if loss_mask is None:
-            loss_mask = np.ones(T, dtype=np.float32)
+            loss_mask = xp.ones(T, dtype=np.float32)
         else:
-            loss_mask = np.asarray(loss_mask, dtype=np.float32)
+            loss_mask = xp.asarray(loss_mask, dtype=np.float32)
 
-        target_probs = probs[np.arange(T), target_ids]
-        per_token_loss = -np.log(np.clip(target_probs, 1e-9, 1.0))
-        loss = np.sum(per_token_loss * loss_mask)
+        target_ids = xp.asarray(target_ids)
+        idx = xp.arange(T)
+        target_probs = probs[idx, target_ids]
+        per_token_loss = -xp.log(xp.clip(target_probs, 1e-9, 1.0))
+        loss = xp.sum(per_token_loss * loss_mask)
 
         # dLoss/dLogits for softmax + cross-entropy: probs - one_hot(target),
         # zeroed out at masked-off positions so they contribute no gradient.
         dlogits = probs.copy()
-        dlogits[np.arange(T), target_ids] -= 1.0
+        dlogits[idx, target_ids] -= 1.0
         dlogits *= loss_mask[:, None]
 
         x_final = cache['x_final']
@@ -514,14 +537,17 @@ class TinyTransformer:
             dx, blk_grads = self.blocks[i].backward(dx, cache['block_caches'][i])
             grads.update({f"blk{i}.{k}": v for k, v in blk_grads.items()})
 
-        dembedding = np.zeros_like(self.embedding)
-        np.add.at(dembedding, cache['input_ids'], dx)
+        dembedding = xp.zeros_like(self.embedding)
+        scatter_add(xp, dembedding, cache['input_ids'], dx)
         grads["embedding"] = dembedding
 
         for g in grads.values():
-            np.clip(g, -5, 5, out=g)
+            xp.clip(g, -5, 5, out=g)
 
-        return loss, grads
+        # Always hand back a plain Python float -- train.py/finetune.py
+        # average, format, and log this value without needing to know or
+        # care which backend produced it.
+        return float(to_host(loss)), grads
 
     def update(self, grads, learning_rate=0.001, beta1=0.9, beta2=0.999, eps=1e-8):
         """Adam optimizer step (Transformers train far more reliably with
@@ -531,13 +557,13 @@ class TinyTransformer:
         for name, p in params.items():
             g = grads[name]
             if name not in self._m:
-                self._m[name] = np.zeros_like(p)
-                self._v[name] = np.zeros_like(p)
+                self._m[name] = self.xp.zeros_like(p)
+                self._v[name] = self.xp.zeros_like(p)
             self._m[name] = beta1 * self._m[name] + (1 - beta1) * g
             self._v[name] = beta2 * self._v[name] + (1 - beta2) * (g * g)
             m_hat = self._m[name] / (1 - beta1 ** self._t)
             v_hat = self._v[name] / (1 - beta2 ** self._t)
-            new_p = p - learning_rate * m_hat / (np.sqrt(v_hat) + eps)
+            new_p = p - learning_rate * m_hat / (self.xp.sqrt(v_hat) + eps)
             self._set_param(name, new_p)
 
     # ------------------------------------------------------------------
@@ -551,8 +577,10 @@ class TinyTransformer:
             window = ids[-self.max_seq_len:]
             logits, _, _ = self.forward(np.array(window))
             last_logits = logits[-1] / max(temperature, 1e-6)
-            probs = softmax(last_logits)
-            next_id = rng.choice(self.vocab_size, p=probs)
+            probs = softmax(last_logits, xp=self.xp)
+            # Sampling a single vocab-sized vector is cheap, so it always
+            # runs on the host -- avoids needing CuPy's own RNG API.
+            next_id = rng.choice(self.vocab_size, p=to_host(probs))
             ids.append(int(next_id))
         return ids
 
@@ -572,7 +600,7 @@ class TinyTransformer:
                 f.write(name_b)
                 f.write(struct.pack("<I", arr.ndim))
                 f.write(struct.pack(f"<{arr.ndim}I", *arr.shape))
-                f.write(arr.astype(np.float32).tobytes())
+                f.write(to_host(arr).astype(np.float32).tobytes())
 
     @classmethod
     def load(cls, filepath, device="cpu"):
@@ -592,5 +620,5 @@ class TinyTransformer:
                 for s in shape:
                     count *= s
                 arr = np.frombuffer(f.read(4 * count), dtype=np.float32).reshape(shape).copy()
-                model._set_param(name, arr)
+                model._set_param(name, model.xp.asarray(arr))
         return model
