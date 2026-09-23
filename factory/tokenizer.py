@@ -31,6 +31,8 @@ import re
 import string
 import sys
 
+import numpy as np
+
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
 DATA_DIR = os.path.join(PROJECT_ROOT, "data")
@@ -52,8 +54,13 @@ SPECIAL_TOKENS = ["<pad>", "<unk>", "<bos>", "<eos>"]
 SAFETY_CHARS = string.ascii_letters + string.digits + string.punctuation + " \n\t"
 
 # --- BPE settings ---------------------------------------------------------
-BPE_VOCAB_SIZE = 800   # total tokens: specials + characters + words + merges
-BPE_MIN_FREQ = 8       # a merge must occur at least this many times to count
+# 16k is a real subword vocab size (GPT-2 uses ~50k on a vastly bigger
+# corpus) -- big enough that most common words get their own token
+# instead of being split into pieces, once there's enough data to earn
+# them. BPE_MIN_FREQ scales with it: a bigger vocab means digging deeper
+# into rarer pairs, so raise the bar a little to still avoid junk merges.
+BPE_VOCAB_SIZE = 16000   # total tokens: specials + characters + words + merges
+BPE_MIN_FREQ = 10        # a merge must occur at least this many times to count
 BPE_MAX_SEED_WORDS = 350
 
 # Guaranteed whole-word tokens, so common words exist even if the corpus
@@ -104,37 +111,69 @@ def _word_freqs(text):
     return freqs
 
 
+def _word_pairs(symbols):
+    """All adjacent symbol pairs in one word's current split."""
+    return zip(symbols, symbols[1:])
+
+
+def _apply_merge(symbols, pair, merged):
+    """Returns a new symbol list with every non-overlapping occurrence
+    of `pair` collapsed into the single symbol `merged`."""
+    new_symbols, i, n = [], 0, len(symbols)
+    while i < n:
+        if i < n - 1 and symbols[i] == pair[0] and symbols[i + 1] == pair[1]:
+            new_symbols.append(merged)
+            i += 2
+        else:
+            new_symbols.append(symbols[i])
+            i += 1
+    return new_symbols
+
+
 def _learn_merges(word_freqs, budget, min_freq):
     """Returns a list of merged substrings, most-frequent-pair-first,
     stopping once `budget` merges are made or no pair repeats often
-    enough (>= min_freq) to be worth keeping."""
+    enough (>= min_freq) to be worth keeping.
+
+    The naive way to do this -- rescan every word in the corpus to
+    recount every pair, on every single merge -- is fine for a few
+    hundred merges over a few dozen KB, but it doesn't scale: at 16k
+    merges over a real (multi-MB+) corpus it would mean re-touching the
+    entire vocabulary tens of thousands of times. Real BPE implementations
+    avoid that by tracking, for each pair, exactly which words contain it
+    (`pair_to_words`), so a merge only has to re-examine the handful of
+    words it actually affects, not the whole corpus every time."""
     splits = {w: list(w) for w in word_freqs}
+    pair_counts = {}
+    pair_to_words = {}
+
+    def touch(word, delta):
+        """Add (or remove, if delta is -1) this word's current pairs
+        to/from the running counts, keyed by the word's own frequency."""
+        freq = word_freqs[word]
+        for pair in _word_pairs(splits[word]):
+            pair_counts[pair] = pair_counts.get(pair, 0) + delta * freq
+            if delta > 0:
+                pair_to_words.setdefault(pair, set()).add(word)
+
+    for w in word_freqs:
+        touch(w, +1)
+
     merges = []
-    while len(merges) < budget:
-        pair_counts = {}
-        for w, freq in word_freqs.items():
-            symbols = splits[w]
-            for a, b in zip(symbols, symbols[1:]):
-                pair_counts[(a, b)] = pair_counts.get((a, b), 0) + freq
-        if not pair_counts:
-            break
+    while len(merges) < budget and pair_counts:
         best_pair = max(pair_counts, key=pair_counts.get)
         if pair_counts[best_pair] < min_freq:
             break
         merged = best_pair[0] + best_pair[1]
         merges.append(merged)
-        for w, symbols in splits.items():
-            new_symbols, i = [], 0
-            while i < len(symbols):
-                if (i < len(symbols) - 1
-                        and symbols[i] == best_pair[0]
-                        and symbols[i + 1] == best_pair[1]):
-                    new_symbols.append(merged)
-                    i += 2
-                else:
-                    new_symbols.append(symbols[i])
-                    i += 1
-            splits[w] = new_symbols
+
+        affected = pair_to_words.pop(best_pair, ())
+        for w in affected:
+            touch(w, -1)                          # remove this word's old pairs
+            splits[w] = _apply_merge(splits[w], best_pair, merged)
+            touch(w, +1)                           # re-add its new pairs
+
+        pair_counts.pop(best_pair, None)           # fully consumed, never re-pick it
     return merges
 
 
@@ -155,6 +194,19 @@ class Tokenizer:
         # Old vocab files without special tokens still load fine.
         self.specials = [t for t in SPECIAL_TOKENS if t in self.token_to_id]
         self.max_token_len = max((len(t) for t in self.token_to_id), default=1)
+        # For each starting character, which token lengths actually exist.
+        # At 16k tokens, trying every length from max_token_len down to 1
+        # at every text position (most of which have no real candidate)
+        # gets slow over a real corpus -- this lets encode() only try
+        # lengths that could possibly match.
+        self._lens_by_first_char = {}
+        for t in self.token_to_id:
+            if t:
+                self._lens_by_first_char.setdefault(t[0], set()).add(len(t))
+        self._lens_by_first_char = {
+            c: sorted(lens, reverse=True)
+            for c, lens in self._lens_by_first_char.items()
+        }
 
     pad_id = property(lambda self: self.token_to_id.get("<pad>"))
     unk_id = property(lambda self: self.token_to_id.get("<unk>"))
@@ -202,20 +254,18 @@ class Tokenizer:
 
     def encode(self, text, parse_special=True):
         vocab = self.token_to_id
-        candidates = vocab if parse_special else {
-            t: i for t, i in vocab.items() if t not in self.specials}
-        max_len = max((len(t) for t in candidates), default=1)
+        skip = self.specials if not parse_special else ()
         ids, i, n = [], 0, len(text)
         while i < n:
-            match_len = min(max_len, n - i)
             token_id = None
-            while match_len > 0:
+            for match_len in self._lens_by_first_char.get(text[i], ()):
+                if match_len > n - i:
+                    continue
                 piece = text[i:i + match_len]
-                if piece in candidates:
-                    token_id = candidates[piece]
+                if piece in vocab and piece not in skip:
+                    token_id = vocab[piece]
                     i += match_len
                     break
-                match_len -= 1
             if token_id is None:
                 if self.unk_id is not None:
                     ids.append(self.unk_id)
@@ -223,6 +273,18 @@ class Tokenizer:
                 continue
             ids.append(token_id)
         return ids
+
+    def encode_to_array(self, text, parse_special=True):
+        """Same tokenization as encode(), but packed into a NumPy array
+        instead of a Python list -- a Python int in a list costs ~28+
+        bytes; a uint16/uint32 array element costs 2-4. That's the
+        difference between a large corpus fitting comfortably in memory
+        or not. Used by train.py when loading the full training corpus;
+        encode() (a plain list) stays the default for short chat prompts
+        and finetune examples, where a NumPy array would just be overhead."""
+        ids = self.encode(text, parse_special=parse_special)
+        dtype = np.uint16 if self.vocab_size <= 65536 else np.uint32
+        return np.array(ids, dtype=dtype)
 
     def decode(self, ids, skip_special=False):
         out = []
