@@ -93,6 +93,21 @@ def build_chunks(ids, seq_length):
     return chunks
 
 
+def batch_iter(chunks, order, batch_size):
+    """Groups shuffled chunk indices batch_size at a time and stacks each
+    group into (B, seq_length) arrays -- this is what actually lets the
+    GPU (or CPU) work on many sequences per step instead of one. Every
+    chunk from build_chunks is the same seq_length, so stacking needs no
+    padding. The last batch in an epoch may come out smaller if the chunk
+    count doesn't divide evenly -- that's fine, loss_and_grads handles any
+    batch size the same way."""
+    for start in range(0, len(order), batch_size):
+        idxs = order[start:start + batch_size]
+        inputs = np.stack([chunks[i][0] for i in idxs])
+        targets = np.stack([chunks[i][1] for i in idxs])
+        yield inputs, targets
+
+
 def save_checkpoint(model, checkpoint_path, meta_path, meta):
     model.save(checkpoint_path)
     with open(meta_path, "w") as f:
@@ -148,7 +163,10 @@ def train(model_name):
     if not data_files:
         sys.exit("No .txt files found in data/. Add training text first.")
     corpus = load_corpus(data_files)
-    ids = tokenizer.encode(corpus)
+    # encode_to_array (not encode()) -- a NumPy uint16/uint32 array instead
+    # of a Python list of ints, which matters once the corpus is large: a
+    # Python int in a list costs 28+ bytes, an array element costs 2-4.
+    ids = tokenizer.encode_to_array(corpus)
     print(f"Corpus: {len(corpus):,} characters -> {len(ids):,} tokens")
 
     resume = os.path.exists(checkpoint_path)
@@ -188,14 +206,17 @@ def train(model_name):
 
     epochs = ask_epochs(config.EPOCHS)
     seq_length = min(config.SEQ_LENGTH, model.max_seq_len - 1)
-    chunks = build_chunks(np.array(ids), seq_length)
+    batch_size = max(1, getattr(config, "BATCH_SIZE", 16))
+    chunks = build_chunks(ids, seq_length)
     if not chunks:
         sys.exit("Corpus is too short for the configured SEQ_LENGTH.")
-    print(f"{len(chunks)} training chunks/epoch, seq_length={seq_length}")
+    batches_per_epoch = -(-len(chunks) // batch_size)  # ceil div
+    print(f"{len(chunks)} training chunks/epoch, seq_length={seq_length}, "
+          f"batch_size={batch_size} -> {batches_per_epoch} steps/epoch")
 
     rng = np.random.default_rng()
     preview = make_preview_fn(architecture)
-    print_every = max(1, len(chunks) // 5)
+    print_every = max(1, batches_per_epoch // 5)
 
     print("\nTraining -- Ctrl+C any time to stop and save.\n")
 
@@ -205,17 +226,16 @@ def train(model_name):
             order = list(range(len(chunks)))
             rng.shuffle(order)
             epoch_loss = 0.0
-            for step_i, idx in enumerate(order, 1):
-                inputs, targets = chunks[idx]
+            for step_i, (inputs, targets) in enumerate(batch_iter(chunks, order, batch_size), 1):
                 loss, grads = model.loss_and_grads(inputs, targets)
                 model.update(grads, learning_rate=config.LEARNING_RATE)
                 epoch_loss += loss
                 total_steps += 1
                 last_loss = loss
 
-                if step_i % print_every == 0 or step_i == len(chunks):
+                if step_i % print_every == 0 or step_i == batches_per_epoch:
                     avg = epoch_loss / step_i
-                    print(f"  epoch {epoch}/{epochs}  step {step_i}/{len(chunks)}  "
+                    print(f"  epoch {epoch}/{epochs}  step {step_i}/{batches_per_epoch}  "
                           f"loss={loss:.3f}  avg={avg:.3f}  total_steps={total_steps}")
 
             sample = preview(model, tokenizer, rng)
