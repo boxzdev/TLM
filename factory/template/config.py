@@ -25,5 +25,6 @@ DEVICE = "__DEVICE__"   # "cpu", "cugpu" (AMD/Intel/NVIDIA), or "gpu" (CuPy/CUDA
 
 # --- Training defaults (train.py may still expose CLI overrides) --------
 SEQ_LENGTH = __SEQ_LENGTH__       # tokens of context per training step
+BATCH_SIZE = __BATCH_SIZE__       # sequences trained on at once per step
 LEARNING_RATE = __LEARNING_RATE__
 EPOCHS = __EPOCHS__
