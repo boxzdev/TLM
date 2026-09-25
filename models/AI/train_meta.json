@@ -1,0 +1,8 @@
+{
+  "model_name": "AI",
+  "total_steps": 16060,
+  "last_loss": 1.5269992351531982,
+  "vocab_size": 4015,
+  "saved_at": "2026-09-25 11:21:03",
+  "interrupted": false
+}

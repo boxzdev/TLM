@@ -14,11 +14,11 @@ MODEL_NAME = "AI"
 # (see architecture.py). vocab_size is NOT set here -- it comes from
 # len(vocab) in this model's tokenize_vocab.json once tokenizer.py has
 # been run, since it isn't known at creation time.
-D_MODEL = 128
-NUM_LAYERS = 4
-NUM_HEADS = 4
-D_FF = 512
-MAX_SEQ_LEN = 128
+D_MODEL = 64
+NUM_LAYERS = 2
+NUM_HEADS = 2
+D_FF = 256
+MAX_SEQ_LEN = 64
 
 # --- Compute backend ----------------------------------------------------
 DEVICE = "cpu"   # "cpu", "cugpu" (AMD/Intel/NVIDIA), or "gpu" (CuPy/CUDA)
