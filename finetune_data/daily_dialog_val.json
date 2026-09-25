@@ -1,0 +1,1670 @@
+[
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "This is my friend Jenny."
+      },
+      {
+        "role": "assistant",
+        "content": "What's her last name?"
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "What is the best place to park?"
+      },
+      {
+        "role": "assistant",
+        "content": "What vehicle do you usually bring to school? Is it an automobile or a motorbike?"
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "I really need a new pair of trousers."
+      },
+      {
+        "role": "assistant",
+        "content": "Do you?"
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "What day is today?"
+      },
+      {
+        "role": "assistant",
+        "content": "Today is Thursday."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Do you mind if I ask you a question?"
+      },
+      {
+        "role": "assistant",
+        "content": "No, not at all. Go ahead."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "What do you need?"
+      },
+      {
+        "role": "assistant",
+        "content": "I need to use the Internet."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "What do you think of this one?"
+      },
+      {
+        "role": "assistant",
+        "content": "Eh, so so."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Mumm. Those burgers smell great. It's perfect day for a barbecue."
+      },
+      {
+        "role": "assistant",
+        "content": "It sure is. I'm glad it didn't rain. My name's Mike Gates, by the way."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Actually the general manager is regarded as a baby doll. He has much sympathy."
+      },
+      {
+        "role": "assistant",
+        "content": "That's right. And his wife is a baby doll, too. She used to have many followers."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "You are friend of Janet, right? I am Andrew, Andrew Smith."
+      },
+      {
+        "role": "assistant",
+        "content": "Nice to meet you, Andrew. I am Noirin, Noirin O'Neil."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Don't be shy. Have some more chicken."
+      },
+      {
+        "role": "assistant",
+        "content": "Thanks."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Where did you go yesterday?"
+      },
+      {
+        "role": "assistant",
+        "content": "I went to play tennis in the public park."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Good morning, Jim!"
+      },
+      {
+        "role": "assistant",
+        "content": "Good morning, Emma! A lovely day, isn't it?"
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Who wants to go first? Allen?"
+      },
+      {
+        "role": "assistant",
+        "content": "Uh... I mostly just like to listen. You're the groom. Why don't you go first?"
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "I was thinking of holding the company retreat in the mountains."
+      },
+      {
+        "role": "assistant",
+        "content": "I agree, I think that that would be perfect!"
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "You and Bob have finished?"
+      },
+      {
+        "role": "assistant",
+        "content": "Yes."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "You can't beat me at tennis."
+      },
+      {
+        "role": "assistant",
+        "content": "Do you want to bet?"
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "I'm here for my appointment."
+      },
+      {
+        "role": "assistant",
+        "content": "What can I do for you today?"
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "what did you do over the weekend?"
+      },
+      {
+        "role": "assistant",
+        "content": "I went a global warming rally in London. It was fantastic to be around so many people who care about the environment."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "it's getting cold."
+      },
+      {
+        "role": "assistant",
+        "content": "yes. I bought a scarf yesterday. It's really nice and warm. Have a look."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "It's all over. I'm bankrupt."
+      },
+      {
+        "role": "assistant",
+        "content": "Don't worry. Everything will be fine."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "How may I help you?"
+      },
+      {
+        "role": "assistant",
+        "content": "I need to check these books out."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Hello, is Jack there?"
+      },
+      {
+        "role": "assistant",
+        "content": "Speaking."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "If he promised to help you, I'm sure he will help. He's a man of his word."
+      },
+      {
+        "role": "assistant",
+        "content": "You said it. I always count on him when I need his help."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "It's four o'clock already. I hate to leave, but I think I must."
+      },
+      {
+        "role": "assistant",
+        "content": "Can you stay a little longer?"
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Are you free tonight?"
+      },
+      {
+        "role": "assistant",
+        "content": "Depends."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "My boss wore a real stupid tie to work today. Can you guess why?"
+      },
+      {
+        "role": "assistant",
+        "content": "He isn't a man of good taste for clothes, is he?"
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "You know Ernie, it seems we both like the same artists."
+      },
+      {
+        "role": "assistant",
+        "content": "Yes, we do. I think we have the same musical tastes."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "There's a letter here for you."
+      },
+      {
+        "role": "assistant",
+        "content": "Let me see it."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Thank you very much for everything you have done for me during my stay in China."
+      },
+      {
+        "role": "assistant",
+        "content": "And I must thank you again for your generous help."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Kelly, the guys and I think you should run for senior class president."
+      },
+      {
+        "role": "assistant",
+        "content": "Me? Why me? Why not you?"
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Would you like to stretch your legs?"
+      },
+      {
+        "role": "assistant",
+        "content": "Sure."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Okay, can I ask you something direct?"
+      },
+      {
+        "role": "assistant",
+        "content": "Ha! It's not like you've ever been one to beat around the bush."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Do you often buy magazines?"
+      },
+      {
+        "role": "assistant",
+        "content": "I buy a computer magazine every month. It keeps me up-to date with all the latest developments."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Hello, Steven. Congratulations!"
+      },
+      {
+        "role": "assistant",
+        "content": "Thank you."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "It seems to me that you are on very good terms with him."
+      },
+      {
+        "role": "assistant",
+        "content": "We actually met at a dance party. He fell for me."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Who's that over here?"
+      },
+      {
+        "role": "assistant",
+        "content": "That's the new teacher."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "how did you do on your BELTS exam?"
+      },
+      {
+        "role": "assistant",
+        "content": "fantastic! I got an overall score of eight."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Have you heard of the Love Bug?"
+      },
+      {
+        "role": "assistant",
+        "content": "Do you mean the'I love you'virus that attacks computers through e-mail?"
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Do you think they two will get married?"
+      },
+      {
+        "role": "assistant",
+        "content": "You can count on it."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "What do you think of that situation comedies showed every weekend?"
+      },
+      {
+        "role": "assistant",
+        "content": "To tell you the truth, I don't think much of them."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Hi Rose, what are you busy with right now?"
+      },
+      {
+        "role": "assistant",
+        "content": "Hi Jack, I'm working on these documents. The manager wants them for half an hour."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "ABC Rent-a-Car. May I help you?"
+      },
+      {
+        "role": "assistant",
+        "content": "I would like to rent a car. What kind of car do you have?"
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Hey, if you're not busy this weekend, would you like to go see a movie?"
+      },
+      {
+        "role": "assistant",
+        "content": "Sounds good. What should we see?"
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "How dare you accuse me of stealing your computer?"
+      },
+      {
+        "role": "assistant",
+        "content": "I'm sorry, but you were the only one who had access to it."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "So the company decided to cancel your trip to Hong Kong?"
+      },
+      {
+        "role": "assistant",
+        "content": "Yes, The SARS epidemic is not under effective control yet. So I'd better not risk it."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "David, I'm going to China."
+      },
+      {
+        "role": "assistant",
+        "content": "Really? How do you get the chance?"
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Bye. Take care."
+      },
+      {
+        "role": "assistant",
+        "content": "You too."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "How can I tell her about this?"
+      },
+      {
+        "role": "assistant",
+        "content": "Don't worry, you'll find a way."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Mom, I just finished my paper. Can you proofread it before I hand it in?"
+      },
+      {
+        "role": "assistant",
+        "content": "Sure, let's take a look. Sweetie, this is terrific. Your ideas are so original."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "How about doing shopping this weekend?"
+      },
+      {
+        "role": "assistant",
+        "content": "What're you going to buy?"
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Jim, I heard you'Ve bought a new computer."
+      },
+      {
+        "role": "assistant",
+        "content": "Yes. Look, it is on my desk."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "In my wedding ceremony, where do my parents sit in the church?"
+      },
+      {
+        "role": "assistant",
+        "content": "The bride's parents'seating arrangement is on the left side of the aisle and the groom's parents is on the right side."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "The band is pretty good. How do you like the music?"
+      },
+      {
+        "role": "assistant",
+        "content": "It's very nice. I haven't heard live music in a while. This is fun."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Wow! I can't believe I'm standing here!"
+      },
+      {
+        "role": "assistant",
+        "content": "What are you so excited about?"
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Too... your face is really oily... perfect!"
+      },
+      {
+        "role": "assistant",
+        "content": "Why? Are you planning to stir-fry my face?"
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Sam, I am so sorry. It was your birthday yesterday and I completely forgot about it."
+      },
+      {
+        "role": "assistant",
+        "content": "Don't worry about it. I keep forgetting everyone's birthdays as well."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Kate, what do you like to do tonight? Do you often go to the movies?"
+      },
+      {
+        "role": "assistant",
+        "content": "Of course. I often go to the movies."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "The sun is up! Time for all the campers to rise. Time to get paddling."
+      },
+      {
+        "role": "assistant",
+        "content": "Oh, no! No more paddling! My arms are sore!"
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Hi, what're you reading?"
+      },
+      {
+        "role": "assistant",
+        "content": "Oh, it's Death on the Nile. Have you read it?"
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "My mother likes to split hairs."
+      },
+      {
+        "role": "assistant",
+        "content": "What do you mean by that?"
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Honey come on! We are going to be late! Honestly, you take longer getting ready than I do!"
+      },
+      {
+        "role": "assistant",
+        "content": "I was drying my hair and ironing my shirt! Can you come here for a sec? I need your help."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "How did your interview go?"
+      },
+      {
+        "role": "assistant",
+        "content": "Pretty well. I don't know if I'll get the promotion or not, but I feel good about it."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Wow, there are so many lanterns to appreciate. Now, I can see why it's called the Lantern Festival. It deserves its name."
+      },
+      {
+        "role": "assistant",
+        "content": "Yeah. People always enjoy the lighted lanterns and the gala performances."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "You must be pretty excited about your trip to Europe. When is it that you are leaving?"
+      },
+      {
+        "role": "assistant",
+        "content": "In just three weeks, and I am excited. But there are still a few things I need to do before I go."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "What day is it?"
+      },
+      {
+        "role": "assistant",
+        "content": "It's Monday, October 27. Speaking of dates, when are you leaving?"
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Excuse me, do you know where the visa office is?"
+      },
+      {
+        "role": "assistant",
+        "content": "Yes, I do. I'll walk you there."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Hey, Jeff, where's your stereo?"
+      },
+      {
+        "role": "assistant",
+        "content": "I needed some money, so I hocked it last week."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Good morning. I want to apply for a library card."
+      },
+      {
+        "role": "assistant",
+        "content": "Give me 10 yuan, your ID card and a photo of you please."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "What are the good sights to see in Beijing?"
+      },
+      {
+        "role": "assistant",
+        "content": "Well, I know you are interested in architecture, so you should't miss the Temple of Heaven, and the Great wall is a must too."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Tom, is Jenny crying?"
+      },
+      {
+        "role": "assistant",
+        "content": "Can you take he away from me?"
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Could you tell me what university you want to go to, John?"
+      },
+      {
+        "role": "assistant",
+        "content": "Pardon?"
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Do you think people still have faith in the government?"
+      },
+      {
+        "role": "assistant",
+        "content": "I don't think so."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Are you ready?"
+      },
+      {
+        "role": "assistant",
+        "content": "Not yet."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Are you all right?"
+      },
+      {
+        "role": "assistant",
+        "content": "I will be all right soon. I was terrified when I watched them fall from the wire."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "What's wrong with you, Mr. Polly?"
+      },
+      {
+        "role": "assistant",
+        "content": "What's wrong? I want a break from this horrible job."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "How do you usually spend your leisure time? I mean, do you have any special interests out of your job?"
+      },
+      {
+        "role": "assistant",
+        "content": "Of course. You see, almost everyone has some kind of hobby"
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "You got a letter in the mail."
+      },
+      {
+        "role": "assistant",
+        "content": "Give it to me."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Come in, come in, what can I do for you?"
+      },
+      {
+        "role": "assistant",
+        "content": "Professor Donald, are you giving your advanced geology course again next semester?"
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Want to meet for lunch this Saturday?"
+      },
+      {
+        "role": "assistant",
+        "content": "Sorry, I can't. I'm busy."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Which sports are popular in your country?"
+      },
+      {
+        "role": "assistant",
+        "content": "Most people like football. More boys like football than girls. A few girls play it really well. Some people like playing basketball."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "John got a heart attack last night."
+      },
+      {
+        "role": "assistant",
+        "content": "Oh really? Is he all right?"
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Thanks for helping me move into my new house."
+      },
+      {
+        "role": "assistant",
+        "content": "Any time. I'm just glad I could help."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Look at these clothes designed by top fashion designer like Versacci, Calvin Klein, and Vivienne Westwood. What do you think of them?"
+      },
+      {
+        "role": "assistant",
+        "content": "Well, they look lovely, but they're not very practical. I mean, would you wear that dress to the office or walking down the street?"
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "I would like to register for a class today."
+      },
+      {
+        "role": "assistant",
+        "content": "No problem, what class would you like to take?"
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "It smells like an ashtray in here!"
+      },
+      {
+        "role": "assistant",
+        "content": "Hi honey! What's wrong? Why do you have that look on your face?"
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "What are you going to do for one year abroad, Tom?"
+      },
+      {
+        "role": "assistant",
+        "content": "Study, study, study. I want to learn a lot."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "I don't think the lecture is very interesting."
+      },
+      {
+        "role": "assistant",
+        "content": "The lecturer is dull, too."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Mom. My legs are killing me."
+      },
+      {
+        "role": "assistant",
+        "content": "Hold on. We will be successful right away."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Did you hear about car accident on Spring Road yesterday?"
+      },
+      {
+        "role": "assistant",
+        "content": "Yes, I did. I heard that they took both drivers to hospital. One needed surgery."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "I'm so nervous about this oral test."
+      },
+      {
+        "role": "assistant",
+        "content": "Just calm down. I'm sure you'll do well."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "What's your email address?"
+      },
+      {
+        "role": "assistant",
+        "content": "It's bulldog 123."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "I've been so stressed these days."
+      },
+      {
+        "role": "assistant",
+        "content": "What's the matter? Are you OK?"
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Do you offer a course in business management?"
+      },
+      {
+        "role": "assistant",
+        "content": "Yes, we do."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "What a police officer!"
+      },
+      {
+        "role": "assistant",
+        "content": "I'Ve never seem such a scene either except in films."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "I've got some bad news about the bike you lent me."
+      },
+      {
+        "role": "assistant",
+        "content": "What's that?"
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Hi, Sue. What's up?"
+      },
+      {
+        "role": "assistant",
+        "content": "Hey, Andrew. How's everything with work?"
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Can you speak English?"
+      },
+      {
+        "role": "assistant",
+        "content": "Yes I can. I speak it very well."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "When can we expect you for dinner? Can you come tonight?"
+      },
+      {
+        "role": "assistant",
+        "content": "Not tonight. I promised to go to a concert with my sister."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Why, Tom? It's five to six already and you are still writing here."
+      },
+      {
+        "role": "assistant",
+        "content": "So what? Are we going anywhere?"
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Sorry I was late for the meeting today. I got stuck in traffic."
+      },
+      {
+        "role": "assistant",
+        "content": "That's okay. Better late than never."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Did you see Ally Mabel last night?"
+      },
+      {
+        "role": "assistant",
+        "content": "Yes, I did. Did you?"
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Hello?"
+      },
+      {
+        "role": "assistant",
+        "content": "Hi Vicky."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Where's your better half?"
+      },
+      {
+        "role": "assistant",
+        "content": "She's at home."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Want to meet for lunch this Saturday?"
+      },
+      {
+        "role": "assistant",
+        "content": "Sorry, I can't. I am busy."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "I have a real problem when I meet people."
+      },
+      {
+        "role": "assistant",
+        "content": "What is it? Maybe I can help."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Oh... I am really worried about the exam. I have no idea what will be on it."
+      },
+      {
+        "role": "assistant",
+        "content": "Why? Just read your notes.You can see what the professor stressed in the lectures.Probably the exam will ask about things he stressed."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "What happen, John?"
+      },
+      {
+        "role": "assistant",
+        "content": "Nothing."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "I am a little nervous about my presentation on Friday."
+      },
+      {
+        "role": "assistant",
+        "content": "If you would like me to, I could help you with that."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Hey, Ted. What are you up to this Friday?"
+      },
+      {
+        "role": "assistant",
+        "content": "Well, I have the day off from work."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Do you have a light?"
+      },
+      {
+        "role": "assistant",
+        "content": "Sorry, I don't smoke."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Bob, I'm really upset with you."
+      },
+      {
+        "role": "assistant",
+        "content": "I'm sorry, I didn't mean to forget our wedding anniversary."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "What do you plan to do for your birthday?"
+      },
+      {
+        "role": "assistant",
+        "content": "I want to have a picnic with my friends, Mum."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "What was that all about?"
+      },
+      {
+        "role": "assistant",
+        "content": "We had a difference of opinion."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Come on, fellows.Let's enjoy my wife's cooking!"
+      },
+      {
+        "role": "assistant",
+        "content": "Em, it's delicious!"
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "What are you going to do after you return from Washington?"
+      },
+      {
+        "role": "assistant",
+        "content": "I'm going to stay in the city."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "How is your new car?"
+      },
+      {
+        "role": "assistant",
+        "content": "Perfect. Couldn't be better."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "The tranquility of the night, the chirping of some insects, everything is so natural!"
+      },
+      {
+        "role": "assistant",
+        "content": "I felt as if I had been in a different world."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Which pair of jeans do you like best?"
+      },
+      {
+        "role": "assistant",
+        "content": "I really like the straight legs."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Hi, Zhengjun, what make you so happy."
+      },
+      {
+        "role": "assistant",
+        "content": "You know what, I've just got a new job with a computer company."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Let's meet tonight at the Thai restaurant at about 5."
+      },
+      {
+        "role": "assistant",
+        "content": "Fine, I'll take a taxi."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Hurry up. Time is running out."
+      },
+      {
+        "role": "assistant",
+        "content": "I see. I have run as fast as I can."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Have you ever played Making?"
+      },
+      {
+        "role": "assistant",
+        "content": "Not really, but I know it is very popular a traditional Chinese gambling game."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Mary, be calm."
+      },
+      {
+        "role": "assistant",
+        "content": "It is impossible. You cheated on me."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Hi, my name is Lean, and I'm from Russia."
+      },
+      {
+        "role": "assistant",
+        "content": "Nice to meet you, Lvan.My name is Alike. I'm from Japan."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Oh, my god! My wallet is lost. What should I do? It drives me bonkers."
+      },
+      {
+        "role": "assistant",
+        "content": "Dear, don't worry. The police can help you."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "How's your new job going?"
+      },
+      {
+        "role": "assistant",
+        "content": "Really well, thanks."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Our unit is participating in a fundraiser this weekend and would like to borrow the van, if possible."
+      },
+      {
+        "role": "assistant",
+        "content": "I would need to check on that. Where is the fundraiser?"
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "You honestly believe the world's improving every year?"
+      },
+      {
+        "role": "assistant",
+        "content": "Yes, I do. I think that science is making us wiser. What do you think?"
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Do you like swimming?"
+      },
+      {
+        "role": "assistant",
+        "content": "Yes. Swimming is one of my most favorite sports, indoors or out-doors."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "How are Zina's new programmers working out?"
+      },
+      {
+        "role": "assistant",
+        "content": "I hate to admit it, but they're good. And fast. The Filipino kid is a genius."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Okay, can I ask you something direct?"
+      },
+      {
+        "role": "assistant",
+        "content": "Ha! It's not like you've ever been one to beat around the bush."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Diana, in your opinion, which is more important, IQ or EQ?"
+      },
+      {
+        "role": "assistant",
+        "content": "Why are you asking me the strange question, Jerry?"
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "What's his job?"
+      },
+      {
+        "role": "assistant",
+        "content": "He used to be a policeman."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "How may I help you?"
+      },
+      {
+        "role": "assistant",
+        "content": "I need to return these books."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "We have waited for a long time. When will we start?"
+      },
+      {
+        "role": "assistant",
+        "content": "Take it easy. I have to cut my losses."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Where is your native place?"
+      },
+      {
+        "role": "assistant",
+        "content": "My native place is Shanghai, which is a very beautiful cosmopolitan city."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "On, darn. The grocery store is closed."
+      },
+      {
+        "role": "assistant",
+        "content": "Yeah, this one closes at ten. We could drive to the 24 - hour store on sixth."
+      }
+    ]
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "What do you do in your free time, Nancy?"
+      },
+      {
+        "role": "assistant",
+        "content": "Well, I like playing the violin."
+      }
+    ]
+  }
+]

@@ -1,5 +1,5 @@
 """
-23 chat.py - Terminal chat interface for a trained TLM model.
+chat.py - Terminal chat interface for a trained TLM model.
 
 Connects DIRECTLY to architecture.py: it imports TinyTransformer (the
 decoder-only Transformer defined there) and drives it token-by-token

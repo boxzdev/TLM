@@ -225,15 +225,15 @@ class MultiHeadAttention:
                 "Wv": self.Wv, "bv": self.bv, "Wo": self.Wo, "bo": self.bo}
 
     def _split_heads(self, x):
-        T = x.shape[0]
-        return x.reshape(T, self.num_heads, self.d_head).transpose(1, 0, 2)
+        B, T, D = x.shape
+        return x.reshape(B, T, self.num_heads, self.d_head).transpose(0, 2, 1, 3)
 
     def _merge_heads(self, x):
-        H, T, Dh = x.shape
-        return x.transpose(1, 0, 2).reshape(T, H * Dh)
+        B, H, T, Dh = x.shape
+        return x.transpose(0, 2, 1, 3).reshape(B, T, H * Dh)
 
     def forward(self, x, causal_mask):
-        """x: (T, d_model). causal_mask: (T, T) bool, True = attend allowed."""
+        """x: (B, T, d_model). causal_mask: (T, T) bool, True = attend allowed."""
         Q = x @ self.Wq + self.bq
         K = x @ self.Wk + self.bk
         V = x @ self.Wv + self.bv
@@ -241,11 +241,11 @@ class MultiHeadAttention:
         xp = self.xp
         Qh, Kh, Vh = self._split_heads(Q), self._split_heads(K), self._split_heads(V)
 
-        scores = xp.einsum('htd,hsd->hts', Qh, Kh) / math.sqrt(self.d_head)
-        scores = xp.where(causal_mask[None, :, :], scores, xp.float32(-1e9))
-        attn = softmax(scores, axis=-1, xp=xp)               # (H, T, T)
-        context = xp.einsum('hts,hsd->htd', attn, Vh)         # (H, T, Dh)
-        merged = self._merge_heads(context)                  # (T, D)
+        scores = xp.einsum('bhtd,bhsd->bhts', Qh, Kh) / math.sqrt(self.d_head)
+        scores = xp.where(causal_mask[None, None, :, :], scores, xp.float32(-1e9))
+        attn = softmax(scores, axis=-1, xp=xp)                # (B, H, T, T)
+        context = xp.einsum('bhts,bhsd->bhtd', attn, Vh)       # (B, H, T, Dh)
+        merged = self._merge_heads(context)                   # (B, T, D)
         out = merged @ self.Wo + self.bo
 
         cache = dict(x=x, Qh=Qh, Kh=Kh, Vh=Vh, attn=attn, merged=merged)
@@ -256,28 +256,31 @@ class MultiHeadAttention:
         attn, merged = cache['attn'], cache['merged']
 
         xp = self.xp
-        dWo = merged.T @ dout
-        dbo = dout.sum(axis=0)
+        # Weight grads reduce over both batch and time (every position in
+        # every sequence contributed to shared weights), so a plain .T @
+        # (2D-only) becomes an explicit sum over "b,t" via einsum instead.
+        dWo = xp.einsum('btd,bte->de', merged, dout)
+        dbo = dout.sum(axis=(0, 1))
         dmerged = dout @ self.Wo.T
-        dcontext = self._split_heads(dmerged)                # (H, T, Dh)
+        dcontext = self._split_heads(dmerged)                 # (B, H, T, Dh)
 
-        dattn = xp.einsum('htd,hsd->hts', dcontext, Vh)       # (H, T, T)
-        dVh = xp.einsum('hts,htd->hsd', attn, dcontext)       # (H, T, Dh)
+        dattn = xp.einsum('bhtd,bhsd->bhts', dcontext, Vh)     # (B, H, T, T)
+        dVh = xp.einsum('bhts,bhtd->bhsd', attn, dcontext)     # (B, H, T, Dh)
 
         # softmax backward (per row, over the last axis)
         dscores = attn * (dattn - xp.sum(dattn * attn, axis=-1, keepdims=True))
         dscores = dscores / math.sqrt(self.d_head)
 
-        dQh = xp.einsum('hts,hsd->htd', dscores, Kh)
-        dKh = xp.einsum('hts,htd->hsd', dscores, Qh)
+        dQh = xp.einsum('bhts,bhsd->bhtd', dscores, Kh)
+        dKh = xp.einsum('bhts,bhtd->bhsd', dscores, Qh)
 
         dQ = self._merge_heads(dQh)
         dK = self._merge_heads(dKh)
         dV = self._merge_heads(dVh)
 
-        dWq = x.T @ dQ; dbq = dQ.sum(axis=0)
-        dWk = x.T @ dK; dbk = dK.sum(axis=0)
-        dWv = x.T @ dV; dbv = dV.sum(axis=0)
+        dWq = xp.einsum('btd,bte->de', x, dQ); dbq = dQ.sum(axis=(0, 1))
+        dWk = xp.einsum('btd,bte->de', x, dK); dbk = dK.sum(axis=(0, 1))
+        dWv = xp.einsum('btd,bte->de', x, dV); dbv = dV.sum(axis=(0, 1))
 
         dx = dQ @ self.Wq.T + dK @ self.Wk.T + dV @ self.Wv.T
 
@@ -310,12 +313,13 @@ class FeedForward:
 
     def backward(self, dout, cache):
         x, h_pre, h = cache['x'], cache['h_pre'], cache['h']
-        dW2 = h.T @ dout
-        db2 = dout.sum(axis=0)
+        xp = self.xp
+        dW2 = xp.einsum('btf,bte->fe', h, dout)
+        db2 = dout.sum(axis=(0, 1))
         dh = dout @ self.W2.T
         dh_pre = gelu_backward(h_pre, dh, xp=self.xp)
-        dW1 = x.T @ dh_pre
-        db1 = dh_pre.sum(axis=0)
+        dW1 = xp.einsum('btd,btf->df', x, dh_pre)
+        db1 = dh_pre.sum(axis=(0, 1))
         dx = dh_pre @ self.W1.T
         grads = {"W1": dW1, "b1": db1, "W2": dW2, "b2": db2}
         return dx, grads
@@ -476,11 +480,20 @@ class TinyTransformer:
 
     # ------------------------------------------------------------------
     def forward(self, input_ids):
-        """input_ids: 1D array of token ids, length T. Returns logits (T,V)
-        and a cache list needed for the backward pass."""
-        T = len(input_ids)
-        input_ids = self.xp.asarray(input_ids)
-        x = self.embedding[input_ids] + self.pos_encoding[:T]
+        """input_ids: (T,) for a single sequence, or (B,T) for a batch of B.
+        Returns (logits, probs, cache). A 1D input gets 1D-shaped (T,V)
+        logits/probs back, exactly as before -- generate() and chat.py's
+        own decode loop both pass single sequences and need no changes.
+        A 2D input gets (B,T,V) back. Either way, `cache` internally always
+        keeps the full (B,T,...) shapes, since loss_and_grads needs them
+        for the backward pass regardless of what the caller asked for."""
+        xp = self.xp
+        input_ids = xp.asarray(input_ids)
+        squeeze = input_ids.ndim == 1
+        ids2d = input_ids[None, :] if squeeze else input_ids
+        B, T = ids2d.shape
+
+        x = self.embedding[ids2d] + self.pos_encoding[:T]     # (B,T,D)
         mask = self._causal_mask(T)
 
         block_caches = []
@@ -488,11 +501,13 @@ class TinyTransformer:
             x, cache = blk.forward(x, mask)
             block_caches.append(cache)
 
-        logits = x @ self.Wout + self.bout                   # Linear
-        probs = softmax(logits, axis=-1, xp=self.xp)          # Softmax
+        logits = x @ self.Wout + self.bout                   # (B,T,V)  Linear
+        probs = softmax(logits, axis=-1, xp=self.xp)          # (B,T,V)  Softmax
 
-        cache = dict(input_ids=input_ids, x_final=x, probs=probs,
+        cache = dict(input_ids=ids2d, x_final=x, probs=probs,
                      block_caches=block_caches)
+        if squeeze:
+            return logits[0], probs[0], cache
         return logits, probs, cache
 
     def loss_and_grads(self, input_ids, target_ids, loss_mask=None):
@@ -507,30 +522,49 @@ class TinyTransformer:
         1s (every position counts) -- exactly the old unmasked behavior
         train.py already relies on, so this is fully backward-compatible."""
         xp = self.xp
-        T = len(input_ids)
-        logits, probs, cache = self.forward(input_ids)
-
-        if loss_mask is None:
-            loss_mask = xp.ones(T, dtype=np.float32)
-        else:
-            loss_mask = xp.asarray(loss_mask, dtype=np.float32)
+        # forward()'s return value gets squeezed back to (T,V) for a 1D
+        # input, so use cache's internal, always-(B,T,...) versions here
+        # instead -- one code path handles a lone sequence (B=1) and a
+        # real batch identically.
+        _, _, cache = self.forward(input_ids)
+        ids2d = cache['input_ids']            # (B, T)
+        probs = cache['probs']                # (B, T, V)
+        B, T = ids2d.shape
 
         target_ids = xp.asarray(target_ids)
-        idx = xp.arange(T)
-        target_probs = probs[idx, target_ids]
+        if target_ids.ndim == 1:
+            target_ids = target_ids[None, :]
+
+        if loss_mask is None:
+            loss_mask = xp.ones((B, T), dtype=np.float32)
+        else:
+            loss_mask = xp.asarray(loss_mask, dtype=np.float32)
+            if loss_mask.ndim == 1:
+                loss_mask = loss_mask[None, :]
+
+        b_idx = xp.arange(B)[:, None]
+        t_idx = xp.arange(T)[None, :]
+        target_probs = probs[b_idx, t_idx, target_ids]        # (B, T)
         per_token_loss = -xp.log(xp.clip(target_probs, 1e-9, 1.0))
-        loss = xp.sum(per_token_loss * loss_mask)
+        # Mean over valid (non-masked) tokens rather than a raw sum. A sum
+        # makes gradient size scale with batch_size * seq_len, so the same
+        # learning rate and [-5,5] clip would mean something different for
+        # every batch size; a mean keeps them comparable no matter how
+        # many sequences or tokens went into a step.
+        valid_count = xp.maximum(xp.sum(loss_mask), 1.0)
+        loss = xp.sum(per_token_loss * loss_mask) / valid_count
 
         # dLoss/dLogits for softmax + cross-entropy: probs - one_hot(target),
-        # zeroed out at masked-off positions so they contribute no gradient.
+        # zeroed out at masked-off positions so they contribute no gradient,
+        # and divided by valid_count to match the mean above.
         dlogits = probs.copy()
-        dlogits[idx, target_ids] -= 1.0
-        dlogits *= loss_mask[:, None]
+        dlogits[b_idx, t_idx, target_ids] -= 1.0
+        dlogits *= loss_mask[:, :, None] / valid_count
 
-        x_final = cache['x_final']
-        dWout = x_final.T @ dlogits
-        dbout = dlogits.sum(axis=0)
-        dx = dlogits @ self.Wout.T
+        x_final = cache['x_final']                            # (B, T, D)
+        dWout = xp.einsum('btd,btv->dv', x_final, dlogits)
+        dbout = dlogits.sum(axis=(0, 1))
+        dx = dlogits @ self.Wout.T                            # (B, T, D)
 
         grads = {"Wout": dWout, "bout": dbout}
         for i in reversed(range(self.num_layers)):
@@ -538,7 +572,7 @@ class TinyTransformer:
             grads.update({f"blk{i}.{k}": v for k, v in blk_grads.items()})
 
         dembedding = xp.zeros_like(self.embedding)
-        scatter_add(xp, dembedding, cache['input_ids'], dx)
+        scatter_add(xp, dembedding, ids2d, dx)                # (B,T) indices, (B,T,D) values
         grads["embedding"] = dembedding
 
         for g in grads.values():

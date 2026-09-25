@@ -14,16 +14,17 @@ MODEL_NAME = "AI"
 # (see architecture.py). vocab_size is NOT set here -- it comes from
 # len(vocab) in this model's tokenize_vocab.json once tokenizer.py has
 # been run, since it isn't known at creation time.
-D_MODEL = 64
-NUM_LAYERS = 2
-NUM_HEADS = 2
-D_FF = 256
-MAX_SEQ_LEN = 64
+D_MODEL = 128
+NUM_LAYERS = 4
+NUM_HEADS = 4
+D_FF = 512
+MAX_SEQ_LEN = 128
 
 # --- Compute backend ----------------------------------------------------
 DEVICE = "cpu"   # "cpu", "cugpu" (AMD/Intel/NVIDIA), or "gpu" (CuPy/CUDA)
 
 # --- Training defaults (train.py may still expose CLI overrides) --------
 SEQ_LENGTH = 64       # tokens of context per training step
+BATCH_SIZE = 16       # sequences trained on at once per step
 LEARNING_RATE = 0.001
 EPOCHS = 10

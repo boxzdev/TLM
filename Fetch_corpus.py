@@ -2,21 +2,14 @@
 fetch_corpus.py
 
 Downloads free training text into your data/ folder from two sources:
-  - Project Gutenberg (public-domain novels and philosophy classics),
-    found via the Gutendex API (https://gutendex.com) so no book IDs
-    need to be hardcoded.
-  - Wikipedia (CC BY-SA articles), via Wikipedia's own API.
+  - Project Gutenberg (public-domain novels and foundational classics),
+    found via the Gutendex API (https://gutendex.com).
+  - Wikipedia (CC BY-SA articles), via Wikipedia's extract API.
 
-Both sources are free to reuse -- Gutenberg books here are out of
-copyright, and Wikipedia text is openly licensed.
+Both sources are free to reuse without licensing friction.
 
-Run from your project's root folder (the one containing data/,
-factory/, training/):
+Run from your project root:
     python fetch_corpus.py
-
-Edit GUTENBERG_SEARCHES and WIKI_TOPICS below to change what it grabs.
-After it finishes, re-run tokenizer.py and train.py from scratch,
-since the vocab and corpus both changed.
 """
 
 import json
@@ -27,27 +20,83 @@ import urllib.parse
 import urllib.request
 
 DATA_DIR = os.path.join(os.getcwd(), "data")
-HEADERS = {"User-Agent": "TLM-corpus-fetcher/1.0 (personal ML training data)"}
-PAUSE_SECONDS = 1.0  # be polite to free APIs
+HEADERS = {"User-Agent": "TLM-corpus-fetcher/1.1 (personal ML training research; contact@example.com)"}
+PAUSE_SECONDS = 1.0  # Polite interval for free public APIs
+SKIP_EXISTING = True # Skip files that are already downloaded
 
-# Gutenberg: public-domain novels and philosophy, found by search term.
+# =====================================================================
+# 1. Project Gutenberg: Public-domain books (novels, philosophy, science)
+# =====================================================================
 GUTENBERG_SEARCHES = [
-    "Pride and Prejudice Jane Austen",
-    "Frankenstein Mary Shelley",
-    "Alice's Adventures in Wonderland",
-    "Adventures of Sherlock Holmes",
+    # Philosophy & Political Theory
     "Plato Republic",
     "Meditations Marcus Aurelius",
     "Nietzsche Thus Spoke Zarathustra",
+    "Nietzsche Beyond Good and Evil",
     "Aristotle Nicomachean Ethics",
+    "The Prince Niccolo Machiavelli",
+    "Leviathan Thomas Hobbes",
+    "Walden Henry David Thoreau",
+    "The Wealth of Nations Adam Smith",
+    "Critique of Pure Reason Immanuel Kant",
+    "Spinoza Ethics",
+    "A Vindication of the Rights of Woman Mary Wollstonecraft",
+    "The Art of War Sunzi",
+
+    # Foundational Science & Essays
+    "On the Origin of Species Charles Darwin",
+    "Relativity Special and General Theory Albert Einstein",
+    "Dialogues Concerning Two New Sciences Galileo",
+
+    # Classic Literature & Fiction
+    "Pride and Prejudice Jane Austen",
+    "Frankenstein Mary Shelley",
+    "Alice's Adventures in Wonderland Lewis Carroll",
+    "The Adventures of Sherlock Holmes Arthur Conan Doyle",
+    "Moby Dick Herman Melville",
+    "Great Expectations Charles Dickens",
+    "A Tale of Two Cities Charles Dickens",
+    "The Count of Monte Cristo Alexandre Dumas",
+    "Crime and Punishment Fyodor Dostoyevsky",
+    "The Brothers Karamazov Fyodor Dostoyevsky",
+    "The Picture of Dorian Gray Oscar Wilde",
+    "Dracula Bram Stoker",
+    "The Time Machine H. G. Wells",
+    "The War of the Worlds H. G. Wells",
+    "The Iliad Homer",
+    "The Odyssey Homer",
+    "The Metamorphosis Franz Kafka",
+    "The Adventures of Tom Sawyer Mark Twain",
+    "Heart of Darkness Joseph Conrad",
+    "Treasure Island Robert Louis Stevenson",
 ]
 
-# Wikipedia: open-license articles, by exact page title.
+# =====================================================================
+# 2. Wikipedia: Concise, factual, high-density expository articles
+# =====================================================================
 WIKI_TOPICS = [
+    # Philosophy & Mind
     "Philosophy", "Stoicism", "Existentialism", "Epistemology", "Ethics",
     "Metaphysics", "Socrates", "Plato", "Aristotle", "Immanuel Kant",
     "Friedrich Nietzsche", "Rationalism", "Empiricism", "Logic",
-    "Consciousness", "Free will", "Utilitarianism",
+    "Consciousness", "Free will", "Utilitarianism", "Phenomenology",
+    "Cognitive science", "Philosophy of mind",
+
+    # Computer Science, AI & Mathematics
+    "Computer science", "Algorithm", "Artificial intelligence", "Machine learning",
+    "Deep learning", "Artificial neural network", "Natural language processing",
+    "Information theory", "Turing machine", "Mathematics", "Calculus",
+    "Probability theory", "Linear algebra", "Graph theory", "Cryptography",
+
+    # Natural Sciences & Astronomy
+    "Physics", "General relativity", "Quantum mechanics", "Thermodynamics",
+    "Speed of light", "Black hole", "Astronomy", "Solar System", "Milky Way",
+    "Evolution", "DNA", "Cell biology", "Ecology", "Plate tectonics",
+
+    # World History & Civilizations
+    "History of the world", "Ancient Greece", "Roman Empire", "Silk Road",
+    "Renaissance", "Age of Enlightenment", "Industrial Revolution",
+    "Printing press", "Scientific Revolution", "World War I", "World War II",
 ]
 
 
@@ -64,7 +113,7 @@ def http_get(url, timeout=20):
 
 def strip_gutenberg_boilerplate(text):
     """Gutenberg wraps every file in a license header/footer. Keep only
-    the actual work, between the START and END markers."""
+    the actual work between the START and END markers."""
     start = re.search(r"\*\*\*\s*START OF (THE|THIS) PROJECT GUTENBERG.*?\*\*\*", text, re.I)
     end = re.search(r"\*\*\*\s*END OF (THE|THIS) PROJECT GUTENBERG.*?\*\*\*", text, re.I)
     if start and end and end.start() > start.end():
@@ -73,78 +122,106 @@ def strip_gutenberg_boilerplate(text):
 
 
 def fetch_gutenberg(search_term):
+    slug = slugify(search_term)
+    target_pattern = f"gutenberg_{slug}"
+
+    if SKIP_EXISTING:
+        for existing in os.listdir(DATA_DIR):
+            if existing.startswith(target_pattern) and os.path.getsize(os.path.join(DATA_DIR, existing)) > 0:
+                print(f"  [skipped] '{search_term}' already downloaded.")
+                return 0
+
     query = urllib.parse.quote(search_term)
-    data = json.loads(http_get(f"https://gutendex.com/books/?search={query}"))
+    url = f"https://gutendex.com/books/?search={query}"
+    data = json.loads(http_get(url))
     results = data.get("results", [])
     if not results:
-        print(f"  no match for '{search_term}'")
+        print(f"  [missing] no match found for '{search_term}'")
         return None
+
     book = results[0]
     formats = book.get("formats", {})
-    text_url = next((u for k, u in formats.items()
-                      if k.startswith("text/plain")), None)
+    text_url = next((u for k, u in formats.items() if k.startswith("text/plain")), None)
+
     if not text_url:
-        print(f"  no plain-text format for '{book.get('title')}'")
+        print(f"  [unsupported] no plain-text format for '{book.get('title')}'")
         return None
+
     raw = http_get(text_url)
     text = strip_gutenberg_boilerplate(raw)
     title = book.get("title", search_term)
-    path = os.path.join(DATA_DIR, f"gutenberg_{slugify(title)}.txt")
+    path = os.path.join(DATA_DIR, f"gutenberg_{slug}.txt")
+
     with open(path, "w", encoding="utf-8") as f:
         f.write(text)
-    print(f"  saved '{title}' -> {os.path.basename(path)} ({len(text):,} chars)")
+
+    print(f"  [saved] '{title}' -> {os.path.basename(path)} ({len(text):,} chars)")
     return len(text)
 
 
 def fetch_wikipedia(title):
+    path = os.path.join(DATA_DIR, f"wiki_{slugify(title)}.txt")
+    if SKIP_EXISTING and os.path.exists(path) and os.path.getsize(path) > 0:
+        print(f"  [skipped] Wikipedia '{title}' already exists.")
+        return 0
+
     query = urllib.parse.quote(title)
-    url = ("https://en.wikipedia.org/w/api.php?action=query&format=json"
-           f"&prop=extracts&explaintext=1&redirects=1&titles={query}")
+    url = (
+        "https://en.wikipedia.org/w/api.php?action=query&format=json"
+        f"&prop=extracts&explaintext=1&redirects=1&titles={query}"
+    )
     data = json.loads(http_get(url))
     pages = data.get("query", {}).get("pages", {})
     page = next(iter(pages.values()), {})
     text = page.get("extract", "").strip()
+
     if not text:
-        print(f"  no article found for '{title}'")
+        print(f"  [missing] article extract empty or not found for '{title}'")
         return None
-    path = os.path.join(DATA_DIR, f"wiki_{slugify(title)}.txt")
+
     with open(path, "w", encoding="utf-8") as f:
         f.write(text)
-    print(f"  saved '{title}' -> {os.path.basename(path)} ({len(text):,} chars)")
+
+    print(f"  [saved] '{title}' -> {os.path.basename(path)} ({len(text):,} chars)")
     return len(text)
 
 
 def main():
     os.makedirs(DATA_DIR, exist_ok=True)
-    print(f"Saving into: {DATA_DIR}\n")
+    print(f"Destination: {DATA_DIR}\n")
     total_chars, ok, failed = 0, 0, 0
 
-    print(f"Project Gutenberg ({len(GUTENBERG_SEARCHES)} books):")
+    print(f"=== Project Gutenberg ({len(GUTENBERG_SEARCHES)} targets) ===")
     for term in GUTENBERG_SEARCHES:
         try:
             n = fetch_gutenberg(term)
-            total_chars += n or 0
-            ok += 1 if n else 0
-            failed += 0 if n else 1
+            if n is not None:
+                total_chars += n
+                ok += 1
+            else:
+                failed += 1
         except Exception as e:
-            print(f"  failed '{term}': {e}")
+            print(f"  [error] '{term}': {e}")
             failed += 1
         time.sleep(PAUSE_SECONDS)
 
-    print(f"\nWikipedia ({len(WIKI_TOPICS)} articles):")
+    print(f"\n=== Wikipedia ({len(WIKI_TOPICS)} targets) ===")
     for title in WIKI_TOPICS:
         try:
             n = fetch_wikipedia(title)
-            total_chars += n or 0
-            ok += 1 if n else 0
-            failed += 0 if n else 1
+            if n is not None:
+                total_chars += n
+                ok += 1
+            else:
+                failed += 1
         except Exception as e:
-            print(f"  failed '{title}': {e}")
+            print(f"  [error] '{title}': {e}")
             failed += 1
         time.sleep(PAUSE_SECONDS)
 
-    print(f"\nDone: {ok} files saved, {failed} failed, {total_chars:,} characters total.")
-    print("Next: run tokenizer.py, then train.py (start fresh).")
+    print(f"\nSummary: {ok} processed, {failed} failed.")
+    print(f"New data downloaded: {total_chars:,} characters.")
+    print("Next step: Retrain your tokenizer (`tokenizer.py`), then launch training (`train.py`).")
 
 
 if __name__ == "__main__":
