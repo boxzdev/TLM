@@ -90,12 +90,14 @@ def ask_architecture():
                 d_ff=d_ff, max_seq_len=max_seq_len)
 
 
-def preview_params(arch, vocab_estimate=2000):
+def preview_params(arch, vocab_estimate=16000):
     total = calculate_model_parameters(
         arch['d_model'], vocab_estimate, arch['num_layers'],
-        arch['num_heads'], arch['d_ff'])
+        arch['num_heads'], arch['d_ff'], tie_weights=True)
     print(f"\nEstimated parameters at a ~{vocab_estimate}-token vocab: ~{total:,}")
-    print("  (Final count depends on the real vocab size from tokenizer.py.)")
+    print("  (Upper estimate -- the real vocab is whatever tokenizer.py builds from your")
+    print("   data, often much smaller on a small corpus. Most of a small model's")
+    print("   parameters are the embedding + output layers, which scale with vocab.)")
 
 
 # ============================================================================
@@ -124,6 +126,10 @@ def create_model(name, arch, device):
         "__DEVICE__": device,
         "__SEQ_LENGTH__": str(min(arch["max_seq_len"], 64)),
         "__BATCH_SIZE__": "16",
+        "__ACCUM_STEPS__": "1",
+        "__DROPOUT__": "0.1",
+        "__WEIGHT_DECAY__": "0.01",
+        "__TIE_WEIGHTS__": "True",
         "__LEARNING_RATE__": "0.001",
         "__EPOCHS__": "10",
     }
