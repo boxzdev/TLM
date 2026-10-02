@@ -206,7 +206,27 @@ def make_negatives(real_prompts, n, rng):
     return negs
 
 
-def augment(conversations, rng):
+def pick_augmentation(n_conversations):
+    """Augmentation multiplies the dataset ~8x by default. That's great
+    for a few dozen hand-written examples, but on a big dataset that
+    already has real variety it mostly just burns training time, so scale
+    it down as the data grows. Returns (paraphrase_copies, typo_copies)."""
+    if n_conversations <= 500:
+        return PARAPHRASE_COPIES, TYPO_COPIES
+    if n_conversations <= 5000:
+        return 1, 1
+    return 0, 1
+
+
+def pick_epochs(n_examples):
+    """Default epoch count that shrinks as the dataset grows: ~60k
+    example-passes is plenty, so 30 epochs only makes sense for a tiny
+    set. The user can still type any number at the prompt."""
+    return int(min(DEFAULT_EPOCHS, max(3, round(60000 / max(n_examples, 1)))))
+
+
+def augment(conversations, rng, paraphrase_copies=PARAPHRASE_COPIES,
+            typo_copies=TYPO_COPIES):
     """Returns (augmented conversations, number of 'I don't understand' ones)."""
     def transform(msgs, fn):
         return [dict(m, content=fn(m["content"])) if m.get("role") == "user" else m
@@ -216,16 +236,16 @@ def augment(conversations, rng):
     for msgs in conversations:
         real_prompts += [normalize_prompt(m["content"]) for m in msgs if m.get("role") == "user"]
         out.append(transform(msgs, normalize_prompt))
-        for _ in range(PARAPHRASE_COPIES):
+        for _ in range(paraphrase_copies):
             out.append(transform(msgs, lambda q: reword(normalize_prompt(q), rng)))
-        for _ in range(TYPO_COPIES):
+        for _ in range(typo_copies):
             out.append(transform(msgs, lambda q: add_typos(normalize_prompt(q), rng)))
 
     n_neg = int(len(out) * NEGATIVE_RATIO / (1 - NEGATIVE_RATIO))
     for s in make_negatives(real_prompts, n_neg, rng):
         out.append([{"role": "user", "content": s},
                     {"role": "assistant", "content": NEGATIVE_ANSWER}])
-    return out, len(out) - len(conversations) * (1 + PARAPHRASE_COPIES + TYPO_COPIES)
+    return out, len(out) - len(conversations) * (1 + paraphrase_copies + typo_copies)
 
 
 def build_examples(conversations, tokenizer, max_seq_len):
@@ -351,17 +371,20 @@ def finetune(model_name):
 
     conversations = load_conversations(finetune_files)
     n_orig = len(conversations)
-    conversations, n_neg = augment(conversations, np.random.default_rng())
+    para, typo = pick_augmentation(n_orig)
+    conversations, n_neg = augment(conversations, np.random.default_rng(),
+                                    paraphrase_copies=para, typo_copies=typo)
     print(f"Augmented {n_orig} conversations -> {len(conversations)} examples "
-          f"(rewords, typos, {n_neg} 'I don't understand').")
+          f"({para} reword + {typo} typo copies each, {n_neg} 'I don't understand').")
     examples, skipped = build_examples(conversations, tokenizer, model.max_seq_len)
     if not examples:
         sys.exit("No usable examples after processing finetune_data/. Check the format.")
     print(f"Loaded {len(examples)} conversation example(s) from {len(finetune_files)} file(s)"
           f"{f' ({skipped} skipped)' if skipped else ''}.")
 
-    epochs = ask_epochs(DEFAULT_EPOCHS)
+    epochs = ask_epochs(pick_epochs(len(examples)))
     batch_size = max(1, getattr(config, "BATCH_SIZE", 16))
+    batches_per_epoch = -(-len(examples) // batch_size)
     pad_id = tokenizer.pad_id if tokenizer.pad_id is not None else 0
     rng = np.random.default_rng()
 
@@ -370,12 +393,14 @@ def finetune(model_name):
     interrupted = False
     total_steps = 0
     last_loss = None
+    t_start = time.time()
     try:
         for epoch in range(1, epochs + 1):
             order = list(range(len(examples)))
             rng.shuffle(order)
             epoch_loss = 0.0
             n_batches = 0
+            t_epoch = time.time()
             for input_ids, target_ids, loss_mask in batch_iter(examples, order, batch_size, pad_id):
                 # loss is already a mean over that batch's valid (non-padded,
                 # non-masked) tokens -- see architecture.py -- so averaging
@@ -388,9 +413,16 @@ def finetune(model_name):
                 total_steps += 1
                 last_loss = loss
 
+                if epoch == 1 and n_batches == 10:
+                    per_step = (time.time() - t_start) / 10
+                    est_epoch = per_step * batches_per_epoch
+                    print(f"  ~{per_step:.2f}s/step -> about {est_epoch / 60:.1f} min/epoch, "
+                          f"{est_epoch * epochs / 60:.0f} min total.")
+
             avg = epoch_loss / max(n_batches, 1)
             print(f"  epoch {epoch}/{epochs}  avg loss={avg:.3f}  "
-                  f"batches={n_batches}  total_steps={total_steps}")
+                  f"batches={n_batches}  time={time.time() - t_epoch:.0f}s  "
+                  f"total_steps={total_steps}")
 
     except KeyboardInterrupt:
         interrupted = True
