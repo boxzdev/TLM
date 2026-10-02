@@ -221,6 +221,24 @@ def train(model_name):
     print("\nTraining -- Ctrl+C any time to stop and save.\n")
 
     interrupted = False
+
+    # Long runs (hours, especially on a Colab session that can disconnect
+    # without warning) shouldn't only save at the very end -- snapshot the
+    # checkpoint every few minutes and at the end of every epoch, so a
+    # crash or disconnect loses minutes of progress, not the whole run.
+    AUTOSAVE_SECONDS = 600
+    last_save = time.time()
+
+    def autosave():
+        save_checkpoint(model, checkpoint_path, meta_path, {
+            "model_name": model_name,
+            "total_steps": total_steps,
+            "last_loss": float(last_loss) if last_loss is not None else None,
+            "vocab_size": tokenizer.vocab_size,
+            "saved_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "interrupted": True,   # not finished yet; the final save below overwrites this
+        })
+
     try:
         for epoch in range(1, epochs + 1):
             order = list(range(len(chunks)))
@@ -238,8 +256,15 @@ def train(model_name):
                     print(f"  epoch {epoch}/{epochs}  step {step_i}/{batches_per_epoch}  "
                           f"loss={loss:.3f}  avg={avg:.3f}  total_steps={total_steps}")
 
+                if time.time() - last_save > AUTOSAVE_SECONDS:
+                    autosave()
+                    last_save = time.time()
+                    print(f"  (autosaved at step {total_steps})")
+
             sample = preview(model, tokenizer, rng)
             print(f"  [epoch {epoch} sample] {sample!r}\n")
+            autosave()
+            last_save = time.time()
 
     except KeyboardInterrupt:
         interrupted = True
