@@ -26,5 +26,12 @@ DEVICE = "__DEVICE__"   # "cpu", "cugpu" (AMD/Intel/NVIDIA), or "gpu" (CuPy/CUDA
 # --- Training defaults (train.py may still expose CLI overrides) --------
 SEQ_LENGTH = __SEQ_LENGTH__       # tokens of context per training step
 BATCH_SIZE = __BATCH_SIZE__       # sequences trained on at once per step
+ACCUM_STEPS = __ACCUM_STEPS__     # batches gathered before each weight update
+                                  # (effective batch = BATCH_SIZE x ACCUM_STEPS;
+                                  # raise this instead of BATCH_SIZE if memory is tight)
+DROPOUT = __DROPOUT__             # training-only regularization; 0 turns it off
+WEIGHT_DECAY = __WEIGHT_DECAY__   # gentle weight shrinkage (AdamW); 0 turns it off
+TIE_WEIGHTS = __TIE_WEIGHTS__     # share embedding + output matrix (fewer parameters);
+                                  # only applies when a NEW model is built
 LEARNING_RATE = __LEARNING_RATE__
 EPOCHS = __EPOCHS__
