@@ -7,7 +7,10 @@ Plain character-level BPE on a small corpus tends to merge meaningless
 pairs ("ui", "ny", "thi") before it ever reaches real words, because
 those pairs repeat by coincidence often enough on a few dozen KB of
 text. This version avoids that three ways:
-  1. Merges never cross a whitespace boundary (learned per-word).
+  1. Merges never cross a word boundary (learned per-word), and a word
+     keeps its one leading space as part of itself (" hello"), GPT-2
+     style, so spaces don't cost a token of their own -- before this,
+     roughly a third of every token stream was a lone space.
   2. A merge needs to occur BPE_MIN_FREQ+ times to be kept.
   3. A short list of common English/TLM words is seeded into the vocab
      directly, so real words are guaranteed even if the corpus is too
@@ -97,15 +100,25 @@ language artificial intelligence machine robot chat bot tlm
 """.split()
 
 COMMON_WORDS = list(dict.fromkeys(COMMON_WORDS))[:BPE_MAX_SEED_WORDS]
+# The chat template's labels appear in every single training example.
+COMMON_WORDS += ["User", "Bot"]
 
 
 # ============================================================================
 # BPE training (word-frequency based, never crosses a whitespace boundary)
 # ============================================================================
 
+# Splits text into word-sized pieces for BPE. A word (letters), a run of
+# digits, or a run of punctuation each take ONE optional leading space
+# with them; whitespace runs (newlines, indents) are their own pieces. The
+# final "." alternative guarantees every character lands in some piece, so
+# "".join(pieces) == text always -- nothing is ever dropped.
+_PIECE_RE = re.compile(r" ?[^\W\d_]+| ?\d+| ?[^\s\w]+| ?_+|\s+(?!\S)|\s+|.", re.S)
+
+
 def _word_freqs(text):
     freqs = {}
-    for m in re.finditer(r"\S+", text):
+    for m in _PIECE_RE.finditer(text):
         w = m.group(0)
         freqs[w] = freqs.get(w, 0) + 1
     return freqs
@@ -224,11 +237,14 @@ class Tokenizer:
 
         # 2. seed common words directly, so real words exist even if the
         #    corpus is too small for BPE to find them by frequency alone
+        #    (both " word" -- how it appears mid-sentence -- and "word", the
+        #    form at the start of a line)
         for w in seed_words:
-            if len(vocab) >= vocab_size:
-                break
-            if w not in vocab and all(c in vocab for c in w):
-                vocab[w] = len(vocab)
+            for form in (" " + w, w):
+                if len(vocab) >= vocab_size:
+                    break
+                if form not in vocab and all(c in vocab for c in form):
+                    vocab[form] = len(vocab)
 
         # 3. spend whatever budget is left on data-driven merges, learned
         #    per-word so a merge never crosses a whitespace boundary
@@ -308,6 +324,30 @@ def find_data_files():
     if not os.path.isdir(DATA_DIR):
         return []
     return sorted(f for f in os.listdir(DATA_DIR) if f.endswith(".txt"))
+
+
+def find_finetune_text():
+    """The wording inside finetune_data/*.json (questions + answers). The
+    base corpus alone never contains the words your chatbot is supposed to
+    SAY, so without this they'd be spelled out in fragments forever. This
+    text only helps pick vocabulary; train.py still trains on data/ alone."""
+    folder = os.path.join(PROJECT_ROOT, "finetune_data")
+    if not os.path.isdir(folder):
+        return ""
+    parts = []
+    for name in sorted(os.listdir(folder)):
+        if not name.endswith(".json"):
+            continue
+        try:
+            with open(os.path.join(folder, name), "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except (OSError, ValueError):
+            continue
+        for conv in data if isinstance(data, list) else []:
+            for m in conv.get("messages", []) if isinstance(conv, dict) else []:
+                if isinstance(m, dict) and isinstance(m.get("content"), str):
+                    parts.append(m["content"])
+    return "\n".join(parts)
 
 
 def load_corpus(filenames):
@@ -403,7 +443,10 @@ def main():
     corpus = load_corpus(filenames)
     print(f"\nLoaded {len(corpus):,} characters from {len(filenames)} file(s).")
 
-    tokenizer = Tokenizer.build(corpus)
+    extra = find_finetune_text()
+    if extra:
+        print(f"Also learning vocabulary from finetune_data/ ({len(extra):,} characters).")
+    tokenizer = Tokenizer.build(corpus + "\n" + extra if extra else corpus)
     report(tokenizer, corpus)
 
     dest = os.path.join(MODELS_DIR, model_name, "tokenize_vocab.json")
@@ -414,4 +457,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-    
