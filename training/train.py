@@ -18,6 +18,7 @@ exactly like reaching the end normally does, so you never lose progress.
 
 import importlib.util
 import json
+import math
 import os
 import sys
 import time
@@ -91,6 +92,25 @@ def build_chunks(ids, seq_length):
         chunks.append((ids[i:i + seq_length], ids[i + 1:i + seq_length + 1]))
         i += seq_length
     return chunks
+
+
+# --- learning-rate schedule --------------------------------------------------
+# A constant learning rate wastes the start (too big for fresh weights) and
+# the end (too big to settle). Ramp up over the first few percent of
+# updates, then cosine-decay toward a fraction of the peak. Each run
+# (including a resumed one) follows this schedule over its own updates.
+WARMUP_FRACTION = 0.03
+MAX_WARMUP_STEPS = 2000
+MIN_LR_RATIO = 0.1
+
+
+def lr_at(step, total_steps, peak_lr):
+    warmup = max(1, min(int(total_steps * WARMUP_FRACTION), MAX_WARMUP_STEPS))
+    if step < warmup:
+        return peak_lr * (step + 1) / warmup
+    progress = min(1.0, (step - warmup) / max(1, total_steps - warmup))
+    cosine = 0.5 * (1.0 + math.cos(math.pi * progress))
+    return peak_lr * (MIN_LR_RATIO + (1.0 - MIN_LR_RATIO) * cosine)
 
 
 def batch_iter(chunks, order, batch_size):
@@ -194,6 +214,9 @@ def train(model_name):
             d_ff=config.D_FF,
             max_seq_len=config.MAX_SEQ_LEN,
             device=config.DEVICE,
+            # only pass it when on, so older per-model architecture.py
+            # copies (which don't know the option) keep working untouched
+            **({"tie_weights": True} if getattr(config, "TIE_WEIGHTS", False) else {}),
         )
         print(f"Built new model ({model.total_params:,} params).")
 
@@ -211,8 +234,17 @@ def train(model_name):
     if not chunks:
         sys.exit("Corpus is too short for the configured SEQ_LENGTH.")
     batches_per_epoch = -(-len(chunks) // batch_size)  # ceil div
+    accum = max(1, int(getattr(config, "ACCUM_STEPS", 1)))
+    weight_decay = float(getattr(config, "WEIGHT_DECAY", 0.0))
+    model.dropout_p = float(getattr(config, "DROPOUT", 0.0))
+    update_kw = {"weight_decay": weight_decay} if weight_decay else {}
+    total_updates = -(-batches_per_epoch // accum) * epochs
+    run_step = 0
     print(f"{len(chunks)} training chunks/epoch, seq_length={seq_length}, "
-          f"batch_size={batch_size} -> {batches_per_epoch} steps/epoch")
+          f"batch_size={batch_size} -> {batches_per_epoch} batches/epoch")
+    print(f"effective batch {batch_size * accum} (accumulating {accum}), "
+          f"dropout {model.dropout_p}, weight decay {weight_decay}, "
+          f"lr {config.LEARNING_RATE} with warmup + cosine decay")
 
     rng = np.random.default_rng()
     preview = make_preview_fn(architecture)
@@ -244,12 +276,21 @@ def train(model_name):
             order = list(range(len(chunks)))
             rng.shuffle(order)
             epoch_loss = 0.0
+            acc, n_acc = None, 0
             for step_i, (inputs, targets) in enumerate(batch_iter(chunks, order, batch_size), 1):
                 loss, grads = model.loss_and_grads(inputs, targets)
-                model.update(grads, learning_rate=config.LEARNING_RATE)
+                acc = grads if acc is None else {k: acc[k] + grads[k] for k in acc}
+                n_acc += 1
                 epoch_loss += loss
-                total_steps += 1
                 last_loss = loss
+                if n_acc == accum or step_i == batches_per_epoch:
+                    if n_acc > 1:
+                        acc = {k: v / n_acc for k, v in acc.items()}
+                    model.update(acc, learning_rate=lr_at(run_step, total_updates,
+                                                          config.LEARNING_RATE), **update_kw)
+                    acc, n_acc = None, 0
+                    run_step += 1
+                    total_steps += 1
 
                 if step_i % print_every == 0 or step_i == batches_per_epoch:
                     avg = epoch_loss / step_i
