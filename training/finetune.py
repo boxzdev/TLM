@@ -33,6 +33,7 @@ checkpoint.pre_finetune.bin, so this is never a one-way door.
 import glob
 import importlib.util
 import json
+import math
 import os
 import re
 import shutil
@@ -265,8 +266,10 @@ def build_examples(conversations, tokenizer, max_seq_len):
             if msgs[i]["role"] == "user" and msgs[i + 1]["role"] == "assistant":
                 question = msgs[i]["content"]
                 answer = msgs[i + 1]["content"]
-                text_parts.append((f"User: {question}\nBot: ", 0))
-                text_parts.append((f"{answer}\n{eos}", 1))
+                # "Bot:" has no trailing space; the answer starts with one so
+                # its first word is the normal space-prefixed token (" Hello").
+                text_parts.append((f"User: {question}\nBot:", 0))
+                text_parts.append((f" {answer}\n{eos}", 1))
                 i += 2
             else:
                 i += 1
@@ -303,6 +306,25 @@ def build_examples(conversations, tokenizer, max_seq_len):
         examples.append((input_ids, target_ids, loss_mask))
 
     return examples, skipped
+
+
+# --- learning-rate schedule --------------------------------------------------
+# A constant learning rate wastes the start (too big for fresh weights) and
+# the end (too big to settle). Ramp up over the first few percent of
+# updates, then cosine-decay toward a fraction of the peak. Each run
+# (including a resumed one) follows this schedule over its own updates.
+WARMUP_FRACTION = 0.03
+MAX_WARMUP_STEPS = 2000
+MIN_LR_RATIO = 0.1
+
+
+def lr_at(step, total_steps, peak_lr):
+    warmup = max(1, min(int(total_steps * WARMUP_FRACTION), MAX_WARMUP_STEPS))
+    if step < warmup:
+        return peak_lr * (step + 1) / warmup
+    progress = min(1.0, (step - warmup) / max(1, total_steps - warmup))
+    cosine = 0.5 * (1.0 + math.cos(math.pi * progress))
+    return peak_lr * (MIN_LR_RATIO + (1.0 - MIN_LR_RATIO) * cosine)
 
 
 def pad_batch(examples, idxs, pad_id):
@@ -385,6 +407,15 @@ def finetune(model_name):
     epochs = ask_epochs(pick_epochs(len(examples)))
     batch_size = max(1, getattr(config, "BATCH_SIZE", 16))
     batches_per_epoch = -(-len(examples) // batch_size)
+    accum = max(1, int(getattr(config, "ACCUM_STEPS", 1)))
+    weight_decay = float(getattr(config, "WEIGHT_DECAY", 0.0))
+    model.dropout_p = float(getattr(config, "DROPOUT", 0.0))
+    update_kw = {"weight_decay": weight_decay} if weight_decay else {}
+    total_updates = -(-batches_per_epoch // accum) * epochs
+    run_step = 0
+    print(f"effective batch {batch_size * accum} (accumulating {accum}), "
+          f"dropout {model.dropout_p}, weight decay {weight_decay}, "
+          f"lr {DEFAULT_LEARNING_RATE} with warmup + cosine decay")
     pad_id = tokenizer.pad_id if tokenizer.pad_id is not None else 0
     rng = np.random.default_rng()
 
@@ -400,6 +431,7 @@ def finetune(model_name):
             rng.shuffle(order)
             epoch_loss = 0.0
             n_batches = 0
+            acc, n_acc = None, 0
             t_epoch = time.time()
             for input_ids, target_ids, loss_mask in batch_iter(examples, order, batch_size, pad_id):
                 # loss is already a mean over that batch's valid (non-padded,
@@ -407,11 +439,19 @@ def finetune(model_name):
                 # it further just means averaging the per-batch means below,
                 # not dividing by a raw token count like this used to.
                 loss, grads = model.loss_and_grads(input_ids, target_ids, loss_mask=loss_mask)
-                model.update(grads, learning_rate=DEFAULT_LEARNING_RATE)
+                acc = grads if acc is None else {k: acc[k] + grads[k] for k in acc}
+                n_acc += 1
                 epoch_loss += loss
                 n_batches += 1
-                total_steps += 1
                 last_loss = loss
+                if n_acc == accum or n_batches == batches_per_epoch:
+                    if n_acc > 1:
+                        acc = {k: v / n_acc for k, v in acc.items()}
+                    model.update(acc, learning_rate=lr_at(run_step, total_updates,
+                                                          DEFAULT_LEARNING_RATE), **update_kw)
+                    acc, n_acc = None, 0
+                    run_step += 1
+                    total_steps += 1
 
                 if epoch == 1 and n_batches == 10:
                     per_step = (time.time() - t_start) / 10
