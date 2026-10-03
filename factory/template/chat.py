@@ -130,13 +130,21 @@ def generate_reply(model, tokenizer, prompt_ids, max_new_tokens=200,
     rng = rng or np.random.default_rng()
     ids = list(prompt_ids)
     generated_ids = []
+    started = False   # have we printed any non-space text yet (streaming)?
     eos_id = tokenizer.token_to_id.get("<eos>")
     blocked = [tokenizer.token_to_id[t] for t in ("<pad>", "<bos>", "<unk>")
                if t in tokenizer.token_to_id]
 
     for _ in range(max_new_tokens):
         window = ids[-model.max_seq_len:]
-        logits, _, _ = model.forward(np.array(window))
+        # last_only skips the (expensive, at a big vocab) output projection
+        # for every position but the final one -- the only one decoding
+        # needs. Older per-model architecture.py copies don't have it, so
+        # fall back to the plain call for those.
+        try:
+            logits, _, _ = model.forward(np.array(window), last_only=True)
+        except TypeError:
+            logits, _, _ = model.forward(np.array(window))
         last_logits = logits[-1] / max(temperature, 1e-6)
         for b in blocked:
             last_logits[b] = -1e9
@@ -150,14 +158,18 @@ def generate_reply(model, tokenizer, prompt_ids, max_new_tokens=200,
 
         partial_text = tokenizer.decode(generated_ids)
         if stream:
-            sys.stdout.write(tokenizer.decode([next_id]))
+            piece = tokenizer.decode([next_id])
+            if not started:
+                piece = piece.lstrip()      # the reply's leading space; "Bot: " already printed one
+                started = bool(piece)
+            sys.stdout.write(piece)
             sys.stdout.flush()
 
         for stop in stop_strings:
             if stop in partial_text:
-                return partial_text[:partial_text.index(stop)].rstrip()
+                return partial_text[:partial_text.index(stop)].strip()
 
-    return tokenizer.decode(generated_ids).rstrip()
+    return tokenizer.decode(generated_ids).strip()
 
 
 def normalize_prompt(text):
@@ -169,7 +181,9 @@ def normalize_prompt(text):
 def build_prompt(user_text, raw=False):
     if raw:
         return user_text
-    return f"User: {normalize_prompt(user_text) or user_text}\nBot: "
+    # No trailing space after "Bot:" -- the tokenizer attaches a word's
+    # space to the word (" Hello"), so the reply's first token carries it.
+    return f"User: {normalize_prompt(user_text) or user_text}\nBot:"
 
 
 # ============================================================================
