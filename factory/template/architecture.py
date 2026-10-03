@@ -48,7 +48,8 @@ import struct
 import numpy as np
 
 _HAS_NUMPY = True
-MAGIC = b"TLMD1"  # "TLM Decoder v1" binary checkpoint header
+MAGIC_V1 = b"TLMD1"  # old checkpoints: header had no max_seq_len / tie flag
+MAGIC = b"TLMD2"     # "TLM Decoder v2" binary checkpoint header
 
 
 # ============================================================================
@@ -138,6 +139,35 @@ def xavier(rng, shape):
     fan_in, fan_out = shape[0], shape[-1]
     limit = math.sqrt(6.0 / (fan_in + fan_out))
     return rng.uniform(-limit, limit, size=shape).astype(np.float32)
+
+
+def wgrad(a, b):
+    """Weight gradient for y = a @ W: the sum over every batch/time
+    position of outer(a, b). Written as ONE big matmul over the flattened
+    (batch*time) rows so it runs on BLAS (or cuBLAS) -- the equivalent
+    np.einsum is 5-13x slower at these sizes because it doesn't."""
+    return a.reshape(-1, a.shape[-1]).T @ b.reshape(-1, b.shape[-1])
+
+
+_NP_RNG = np.random.default_rng()
+
+
+def dropout_forward(x, p, xp):
+    """Inverted dropout. Returns (output, mask). With p == 0 the mask is
+    None and x passes through untouched, so training without dropout is
+    bit-for-bit what it was before dropout existed."""
+    if p <= 0.0:
+        return x, None
+    if xp is np:
+        r = _NP_RNG.random(x.shape, dtype=np.float32)
+    else:
+        r = xp.random.random_sample(x.shape, dtype=np.float32)
+    mask = (r >= p).astype(x.dtype) / (1.0 - p)
+    return x * mask, mask
+
+
+def dropout_backward(dout, mask):
+    return dout if mask is None else dout * mask
 
 
 def softmax(x, axis=-1, xp=np):
@@ -241,10 +271,10 @@ class MultiHeadAttention:
         xp = self.xp
         Qh, Kh, Vh = self._split_heads(Q), self._split_heads(K), self._split_heads(V)
 
-        scores = xp.einsum('bhtd,bhsd->bhts', Qh, Kh) / math.sqrt(self.d_head)
+        scores = (Qh @ Kh.transpose(0, 1, 3, 2)) / math.sqrt(self.d_head)
         scores = xp.where(causal_mask[None, None, :, :], scores, xp.float32(-1e9))
         attn = softmax(scores, axis=-1, xp=xp)                # (B, H, T, T)
-        context = xp.einsum('bhts,bhsd->bhtd', attn, Vh)       # (B, H, T, Dh)
+        context = attn @ Vh                                    # (B, H, T, Dh)
         merged = self._merge_heads(context)                   # (B, T, D)
         out = merged @ self.Wo + self.bo
 
@@ -259,28 +289,28 @@ class MultiHeadAttention:
         # Weight grads reduce over both batch and time (every position in
         # every sequence contributed to shared weights), so a plain .T @
         # (2D-only) becomes an explicit sum over "b,t" via einsum instead.
-        dWo = xp.einsum('btd,bte->de', merged, dout)
+        dWo = wgrad(merged, dout)
         dbo = dout.sum(axis=(0, 1))
         dmerged = dout @ self.Wo.T
         dcontext = self._split_heads(dmerged)                 # (B, H, T, Dh)
 
-        dattn = xp.einsum('bhtd,bhsd->bhts', dcontext, Vh)     # (B, H, T, T)
-        dVh = xp.einsum('bhts,bhtd->bhsd', attn, dcontext)     # (B, H, T, Dh)
+        dattn = dcontext @ Vh.transpose(0, 1, 3, 2)            # (B, H, T, T)
+        dVh = attn.transpose(0, 1, 3, 2) @ dcontext            # (B, H, T, Dh)
 
         # softmax backward (per row, over the last axis)
         dscores = attn * (dattn - xp.sum(dattn * attn, axis=-1, keepdims=True))
         dscores = dscores / math.sqrt(self.d_head)
 
-        dQh = xp.einsum('bhts,bhsd->bhtd', dscores, Kh)
-        dKh = xp.einsum('bhts,bhtd->bhsd', dscores, Qh)
+        dQh = dscores @ Kh
+        dKh = dscores.transpose(0, 1, 3, 2) @ Qh
 
         dQ = self._merge_heads(dQh)
         dK = self._merge_heads(dKh)
         dV = self._merge_heads(dVh)
 
-        dWq = xp.einsum('btd,bte->de', x, dQ); dbq = dQ.sum(axis=(0, 1))
-        dWk = xp.einsum('btd,bte->de', x, dK); dbk = dK.sum(axis=(0, 1))
-        dWv = xp.einsum('btd,bte->de', x, dV); dbv = dV.sum(axis=(0, 1))
+        dWq = wgrad(x, dQ); dbq = dQ.sum(axis=(0, 1))
+        dWk = wgrad(x, dK); dbk = dK.sum(axis=(0, 1))
+        dWv = wgrad(x, dV); dbv = dV.sum(axis=(0, 1))
 
         dx = dQ @ self.Wq.T + dK @ self.Wk.T + dV @ self.Wv.T
 
@@ -314,11 +344,11 @@ class FeedForward:
     def backward(self, dout, cache):
         x, h_pre, h = cache['x'], cache['h_pre'], cache['h']
         xp = self.xp
-        dW2 = xp.einsum('btf,bte->fe', h, dout)
+        dW2 = wgrad(h, dout)
         db2 = dout.sum(axis=(0, 1))
         dh = dout @ self.W2.T
         dh_pre = gelu_backward(h_pre, dh, xp=self.xp)
-        dW1 = xp.einsum('btd,btf->df', x, dh_pre)
+        dW1 = wgrad(x, dh_pre)
         db1 = dh_pre.sum(axis=(0, 1))
         dx = dh_pre @ self.W1.T
         grads = {"W1": dW1, "b1": db1, "W2": dW2, "b2": db2}
@@ -346,29 +376,32 @@ class DecoderBlock:
         p.update({f"ffn.{k}": v for k, v in self.ffn.params().items()})
         return p
 
-    def forward(self, x, causal_mask):
+    def forward(self, x, causal_mask, dropout_p=0.0):
         attn_out, attn_cache = self.attn.forward(x, causal_mask)
+        attn_out, drop1 = dropout_forward(attn_out, dropout_p, self.xp)
         res1 = x + attn_out                                  # Add
         norm1, ln1_cache = layer_norm_forward(res1, self.gamma1, self.beta1, xp=self.xp)  # Norm
 
         ffn_out, ffn_cache = self.ffn.forward(norm1)
+        ffn_out, drop2 = dropout_forward(ffn_out, dropout_p, self.xp)
         res2 = norm1 + ffn_out                                # Add
         norm2, ln2_cache = layer_norm_forward(res2, self.gamma2, self.beta2, xp=self.xp)  # Norm
 
         cache = dict(attn_cache=attn_cache, ln1_cache=ln1_cache,
-                     ffn_cache=ffn_cache, ln2_cache=ln2_cache)
+                     ffn_cache=ffn_cache, ln2_cache=ln2_cache,
+                     drop1=drop1, drop2=drop2)
         return norm2, cache
 
     def backward(self, dout, cache):
         dres2, dgamma2, dbeta2 = layer_norm_backward(dout, cache['ln2_cache'], xp=self.xp)
         dnorm1_from_res2 = dres2                              # Add: splits equally
-        dffn_out = dres2
+        dffn_out = dropout_backward(dres2, cache['drop2'])
         dnorm1_from_ffn, ffn_grads = self.ffn.backward(dffn_out, cache['ffn_cache'])
         dnorm1 = dnorm1_from_res2 + dnorm1_from_ffn
 
         dres1, dgamma1, dbeta1 = layer_norm_backward(dnorm1, cache['ln1_cache'], xp=self.xp)
         dx_from_res1 = dres1                                  # Add: splits equally
-        dattn_out = dres1
+        dattn_out = dropout_backward(dres1, cache['drop1'])
         dx_from_attn, attn_grads = self.attn.backward(dattn_out, cache['attn_cache'])
         dx = dx_from_res1 + dx_from_attn
 
@@ -383,7 +416,8 @@ class DecoderBlock:
 # Parameter counting (mirrors calculate_model_parameters from the RNN days)
 # ============================================================================
 
-def calculate_model_parameters(d_model, vocab_size, num_layers=1, num_heads=4, d_ff=None):
+def calculate_model_parameters(d_model, vocab_size, num_layers=1, num_heads=4, d_ff=None,
+                               tie_weights=False):
     if d_ff is None:
         d_ff = d_model * 4
     embed = vocab_size * d_model
@@ -391,7 +425,9 @@ def calculate_model_parameters(d_model, vocab_size, num_layers=1, num_heads=4, d
     per_ffn = (d_model * d_ff + d_ff) + (d_ff * d_model + d_model)
     per_ln = 2 * d_model * 2                              # 2 LayerNorms x (gamma+beta)
     per_block = per_attn + per_ffn + per_ln
-    output_head = d_model * vocab_size + vocab_size
+    # Tied: the output projection reuses the embedding matrix, leaving
+    # only the bias. Untied: a separate d_model x vocab matrix plus bias.
+    output_head = vocab_size if tie_weights else d_model * vocab_size + vocab_size
     return embed + num_layers * per_block + output_head
 
 
@@ -411,7 +447,8 @@ class TinyTransformer:
     """
 
     def __init__(self, vocab_size, d_model=128, num_layers=2, num_heads=4,
-                 d_ff=None, max_seq_len=256, seed=None, device="cpu"):
+                 d_ff=None, max_seq_len=256, seed=None, device="cpu",
+                 tie_weights=False):
         self.vocab_size = vocab_size
         self.d_model = d_model
         self.num_layers = num_layers
@@ -420,6 +457,8 @@ class TinyTransformer:
         self.max_seq_len = max_seq_len
         self.device = device
         self.xp = get_array_module(device)
+        self.tie_weights = bool(tie_weights)
+        self.dropout_p = 0.0     # training-time only; set by train.py/finetune.py
 
         rng = np.random.default_rng(seed)
 
@@ -434,7 +473,10 @@ class TinyTransformer:
                         for _ in range(num_layers)]
 
         # Final Linear -> Softmax head
-        self.Wout = xavier(rng, (d_model, vocab_size))
+        # (With tie_weights, the output projection IS embedding.T -- no
+        # separate matrix -- which saves vocab*d_model parameters, usually
+        # a big share of a small model, and tends to help quality.)
+        self.Wout = None if self.tie_weights else xavier(rng, (d_model, vocab_size))
         self.bout = np.zeros(vocab_size, dtype=np.float32)
 
         # Adam optimizer state (built lazily to match whatever params() returns)
@@ -443,7 +485,8 @@ class TinyTransformer:
         self._t = 0
 
         self.total_params = calculate_model_parameters(
-            d_model, vocab_size, num_layers, num_heads, self.d_ff)
+            d_model, vocab_size, num_layers, num_heads, self.d_ff,
+            tie_weights=self.tie_weights)
 
         # All weights above were built with plain NumPy (deterministic,
         # seedable). Move every one to the selected backend now, once,
@@ -459,7 +502,9 @@ class TinyTransformer:
         return self.xp.tril(self.xp.ones((T, T), dtype=bool))
 
     def params(self):
-        p = {"embedding": self.embedding, "Wout": self.Wout, "bout": self.bout}
+        p = {"embedding": self.embedding, "bout": self.bout}
+        if not self.tie_weights:
+            p["Wout"] = self.Wout
         for i, blk in enumerate(self.blocks):
             p.update({f"blk{i}.{k}": v for k, v in blk.params().items()})
         return p
@@ -479,8 +524,12 @@ class TinyTransformer:
             setattr(blk, rest, value)
 
     # ------------------------------------------------------------------
-    def forward(self, input_ids):
+    def forward(self, input_ids, training=False, last_only=False):
         """input_ids: (T,) for a single sequence, or (B,T) for a batch of B.
+        training=True turns dropout on (loss_and_grads does this);
+        last_only=True computes logits for just the final position -- all
+        generation needs, and with a 16k vocab the output projection over
+        every position is by far the most expensive part of a decode step.
         Returns (logits, probs, cache). A 1D input gets 1D-shaped (T,V)
         logits/probs back, exactly as before -- generate() and chat.py's
         own decode loop both pass single sequences and need no changes.
@@ -493,19 +542,23 @@ class TinyTransformer:
         ids2d = input_ids[None, :] if squeeze else input_ids
         B, T = ids2d.shape
 
+        p = self.dropout_p if training else 0.0
         x = self.embedding[ids2d] + self.pos_encoding[:T]     # (B,T,D)
+        x, emb_mask = dropout_forward(x, p, xp)
         mask = self._causal_mask(T)
 
         block_caches = []
         for blk in self.blocks:
-            x, cache = blk.forward(x, mask)
+            x, cache = blk.forward(x, mask, p)
             block_caches.append(cache)
 
-        logits = x @ self.Wout + self.bout                   # (B,T,V)  Linear
+        x_head = x[:, -1:, :] if last_only else x
+        W = self.embedding.T if self.tie_weights else self.Wout
+        logits = x_head @ W + self.bout                      # (B,T,V)  Linear
         probs = softmax(logits, axis=-1, xp=self.xp)          # (B,T,V)  Softmax
 
         cache = dict(input_ids=ids2d, x_final=x, probs=probs,
-                     block_caches=block_caches)
+                     block_caches=block_caches, emb_mask=emb_mask)
         if squeeze:
             return logits[0], probs[0], cache
         return logits, probs, cache
@@ -526,7 +579,7 @@ class TinyTransformer:
         # input, so use cache's internal, always-(B,T,...) versions here
         # instead -- one code path handles a lone sequence (B=1) and a
         # real batch identically.
-        _, _, cache = self.forward(input_ids)
+        _, _, cache = self.forward(input_ids, training=True)
         ids2d = cache['input_ids']            # (B, T)
         probs = cache['probs']                # (B, T, V)
         B, T = ids2d.shape
@@ -562,17 +615,24 @@ class TinyTransformer:
         dlogits *= loss_mask[:, :, None] / valid_count
 
         x_final = cache['x_final']                            # (B, T, D)
-        dWout = xp.einsum('btd,btv->dv', x_final, dlogits)
         dbout = dlogits.sum(axis=(0, 1))
-        dx = dlogits @ self.Wout.T                            # (B, T, D)
-
-        grads = {"Wout": dWout, "bout": dbout}
+        if self.tie_weights:
+            dhead = wgrad(dlogits, x_final)                   # (V, D) -> embedding
+            dx = dlogits @ self.embedding                     # (B, T, D)
+            grads = {"bout": dbout}
+        else:
+            dhead = None
+            dx = dlogits @ self.Wout.T                        # (B, T, D)
+            grads = {"Wout": wgrad(x_final, dlogits), "bout": dbout}
         for i in reversed(range(self.num_layers)):
             dx, blk_grads = self.blocks[i].backward(dx, cache['block_caches'][i])
             grads.update({f"blk{i}.{k}": v for k, v in blk_grads.items()})
 
+        dx = dropout_backward(dx, cache['emb_mask'])
         dembedding = xp.zeros_like(self.embedding)
         scatter_add(xp, dembedding, ids2d, dx)                # (B,T) indices, (B,T,D) values
+        if dhead is not None:
+            dembedding += dhead                               # tied output head's gradient
         grads["embedding"] = dembedding
 
         for g in grads.values():
@@ -583,7 +643,8 @@ class TinyTransformer:
         # care which backend produced it.
         return float(to_host(loss)), grads
 
-    def update(self, grads, learning_rate=0.001, beta1=0.9, beta2=0.999, eps=1e-8):
+    def update(self, grads, learning_rate=0.001, beta1=0.9, beta2=0.999, eps=1e-8,
+               weight_decay=0.0):
         """Adam optimizer step (Transformers train far more reliably with
         Adam than with the RNN engine's Adagrad, so this engine uses Adam)."""
         self._t += 1
@@ -598,6 +659,11 @@ class TinyTransformer:
             m_hat = self._m[name] / (1 - beta1 ** self._t)
             v_hat = self._v[name] / (1 - beta2 ** self._t)
             new_p = p - learning_rate * m_hat / (self.xp.sqrt(v_hat) + eps)
+            if weight_decay and p.ndim >= 2:
+                # Decoupled (AdamW-style) decay on weight matrices only --
+                # not biases or LayerNorm scales -- shrinking weights a
+                # little each step to discourage memorizing the data.
+                new_p = new_p - learning_rate * weight_decay * p
             self._set_param(name, new_p)
 
     # ------------------------------------------------------------------
@@ -609,7 +675,7 @@ class TinyTransformer:
         ids = list(input_ids)
         for _ in range(max_new_tokens):
             window = ids[-self.max_seq_len:]
-            logits, _, _ = self.forward(np.array(window))
+            logits, _, _ = self.forward(np.array(window), last_only=True)
             last_logits = logits[-1] / max(temperature, 1e-6)
             probs = softmax(last_logits, xp=self.xp)
             # Sampling a single vocab-sized vector is cheap, so it always
@@ -629,6 +695,7 @@ class TinyTransformer:
             f.write(MAGIC)
             f.write(struct.pack("<IIIII", self.vocab_size, self.d_model,
                                  self.num_layers, self.num_heads, self.d_ff))
+            f.write(struct.pack("<II", self.max_seq_len, 1 if self.tie_weights else 0))
             f.write(struct.pack("<I", len(params)))
             for name, arr in params.items():
                 name_b = name.encode("utf-8")
@@ -642,10 +709,17 @@ class TinyTransformer:
     def load(cls, filepath, device="cpu"):
         with open(filepath, "rb") as f:
             magic = f.read(len(MAGIC))
-            if magic != MAGIC:
-                raise ValueError(f"Not a TLMD1 checkpoint: {filepath}")
+            if magic not in (MAGIC, MAGIC_V1):
+                raise ValueError(f"Not a TLM checkpoint: {filepath}")
             vocab_size, d_model, num_layers, num_heads, d_ff = struct.unpack("<IIIII", f.read(20))
-            model = cls(vocab_size, d_model, num_layers, num_heads, d_ff, device=device)
+            if magic == MAGIC:
+                max_seq_len, flags = struct.unpack("<II", f.read(8))
+                model = cls(vocab_size, d_model, num_layers, num_heads, d_ff,
+                            max_seq_len=max_seq_len, device=device,
+                            tie_weights=bool(flags & 1))
+            else:
+                # v1 files never recorded max_seq_len or tying (always untied).
+                model = cls(vocab_size, d_model, num_layers, num_heads, d_ff, device=device)
             (n_params,) = struct.unpack("<I", f.read(4))
             for _ in range(n_params):
                 (name_len,) = struct.unpack("<H", f.read(2))
