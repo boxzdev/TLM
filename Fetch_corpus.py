@@ -97,10 +97,30 @@ WIKI_TOPICS = [
     "History of the world", "Ancient Greece", "Roman Empire", "Silk Road",
     "Renaissance", "Age of Enlightenment", "Industrial Revolution",
     "Printing press", "Scientific Revolution", "World War I", "World War II",
+
+    # Programming: Python, C++ & software fundamentals
+    "Python (programming language)", "C++", "C (programming language)",
+    "Programming language", "Object-oriented programming", "Functional programming",
+    "Data structure", "Compiler", "Interpreter (computing)", "Software engineering",
+    "Operating system", "Computer architecture", "Garbage collection (computer science)",
+    "Template (C++)", "Standard Template Library", "NumPy", "Git", "Unit testing",
+    "Concurrency (computer science)", "Computer network",
+
+    # Maker culture & electronics
+    "Maker culture", "Arduino", "Raspberry Pi", "Microcontroller", "Electronics",
+    "Printed circuit board", "Soldering", "3D printing", "Fused filament fabrication",
+    "Laser cutting", "Hackerspace", "Open-source hardware", "Robotics", "Internet of things",
+
+    # Manufacturing & production
+    "Manufacturing", "Mass production", "Assembly line",
+    "CNC", "Computer-aided design", "Computer-aided manufacturing", "Injection moulding",
+    "Machining", "Welding", "Casting", "Lean manufacturing", "Quality control",
+    "Supply chain management", "Automation", "Industrial engineering",
 ]
 
 
 def slugify(text, max_len=40):
+    text = text.replace("++", "plusplus").replace("#", "sharp")  # keep "C++" / "C#" distinct from "C"
     s = re.sub(r"[^a-zA-Z0-9]+", "_", text.lower()).strip("_")
     return s[:max_len] or "untitled"
 
