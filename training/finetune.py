@@ -36,8 +36,10 @@ import json
 import math
 import os
 import re
+import select
 import shutil
 import sys
+import threading
 import time
 
 import numpy as np
@@ -308,6 +310,65 @@ def build_examples(conversations, tokenizer, max_seq_len):
     return examples, skipped
 
 
+# --- stopping without Ctrl+C -------------------------------------------------
+# Tablets, phone keyboards and some web terminals (Lightning AI, Codespaces
+# in a browser) can't send Ctrl+C. Two other ways to end a run -- both
+# finish the current step, save checkpoint + metadata, and exit, exactly
+# like Ctrl+C does:
+#   * type  stop  and press Enter in the same terminal
+#   * create an empty file named STOP in the model's folder (from a second
+#     terminal or the file browser; also the way to do it in a notebook,
+#     where typing into a running script isn't possible)
+STOP_WORDS = {"stop", "quit", "exit", "cancel", "save"}
+
+
+class StopListener:
+    def __init__(self, stop_file):
+        self.stop_file = stop_file
+        self.requested = False
+        self._done = False
+        try:                                  # a STOP file left over from last time
+            os.remove(stop_file)              # must not end this run instantly
+        except OSError:
+            pass
+        threading.Thread(target=self._listen, daemon=True).start()
+
+    def _listen(self):
+        # Polls the raw terminal with select() instead of blocking in
+        # sys.stdin.readline(): a daemon thread stuck inside a blocking
+        # stdin read can crash Python when the script finishes.
+        buf = b""
+        try:
+            while not self._done:
+                ready, _, _ = select.select([0], [], [], 0.5)
+                if not ready:
+                    continue
+                chunk = os.read(0, 4096)
+                if not chunk:                 # stdin closed / piped input ran out
+                    return
+                buf += chunk
+                while b"\n" in buf:
+                    line, buf = buf.split(b"\n", 1)
+                    if line.decode("utf-8", "ignore").strip().lower() in STOP_WORDS:
+                        self.requested = True
+                        return
+        except (OSError, ValueError):
+            return                            # no usable stdin; the STOP file still works
+
+    def check(self):
+        if not self.requested and os.path.exists(self.stop_file):
+            self.requested = True
+        if self.requested:
+            try:
+                os.remove(self.stop_file)
+            except OSError:
+                pass
+        return self.requested
+
+    def close(self):
+        self._done = True
+
+
 # --- learning-rate schedule --------------------------------------------------
 # A constant learning rate wastes the start (too big for fresh weights) and
 # the end (too big to settle). Ramp up over the first few percent of
@@ -371,6 +432,7 @@ def finetune(model_name):
     arch_path = os.path.join(model_dir, "architecture.py")
     checkpoint_path = os.path.join(model_dir, "checkpoint.bin")
     backup_path = os.path.join(model_dir, "checkpoint.pre_finetune.bin")
+    last_backup_path = os.path.join(model_dir, "checkpoint.before_last_finetune.bin")
     meta_path = os.path.join(model_dir, "train_meta.json")
 
     if not os.path.exists(checkpoint_path):
@@ -388,8 +450,32 @@ def finetune(model_name):
     model = architecture.TinyTransformer.load(checkpoint_path, device=config.DEVICE)
     print(f"Loaded '{model_name}' ({model.total_params:,} params) for fine-tuning.")
 
-    shutil.copy(checkpoint_path, backup_path)
-    print(f"Backed up pre-finetune weights to {backup_path}")
+    # Step history from train.py and any earlier fine-tunes. This used to be
+    # ignored: the counter restarted at 0 and the final save overwrote the
+    # whole history with just this run's count.
+    prev_meta = {}
+    if os.path.exists(meta_path):
+        try:
+            with open(meta_path) as f:
+                prev_meta = json.load(f)
+        except (OSError, ValueError):
+            prev_meta = {}
+    steps_before = int(prev_meta.get("total_steps", 0))
+    base_steps = prev_meta.get("base_steps")
+    if base_steps is None and not prev_meta.get("fine_tuned"):
+        base_steps = steps_before          # first fine-tune: everything so far was base training
+    ft_steps_before = int(prev_meta.get("finetune_steps", 0))
+    ft_runs_before = int(prev_meta.get("finetune_runs", 0))
+
+    # Two backups: the untouched base model (made once, never overwritten --
+    # it used to be replaced by an already-fine-tuned copy on every run, so
+    # "revert" stopped meaning what it said after the second fine-tune), and
+    # the weights right before THIS run.
+    if not os.path.exists(backup_path):
+        shutil.copy(checkpoint_path, backup_path)
+        print(f"Backed up the base model to {backup_path} (kept across all fine-tunes)")
+    shutil.copy(checkpoint_path, last_backup_path)
+    print(f"Backed up the weights from before this run to {last_backup_path}")
 
     conversations = load_conversations(finetune_files)
     n_orig = len(conversations)
@@ -419,12 +505,35 @@ def finetune(model_name):
     pad_id = tokenizer.pad_id if tokenizer.pad_id is not None else 0
     rng = np.random.default_rng()
 
-    print("\nFine-tuning -- Ctrl+C any time to stop and save.\n")
+    stop = StopListener(os.path.join(model_dir, "STOP"))
+    print("\nFine-tuning. To stop and save: press Ctrl+C, OR type  stop  and press Enter,")
+    print(f"OR create an empty file named STOP in {model_dir}\n")
 
     interrupted = False
-    total_steps = 0
+    total_steps = steps_before          # cumulative: base training + all fine-tunes
     last_loss = None
     t_start = time.time()
+
+    def make_meta(interrupted_flag):
+        return {
+            "model_name": model_name,
+            "total_steps": total_steps,
+            "base_steps": base_steps,
+            "finetune_steps": ft_steps_before + (total_steps - steps_before),
+            "finetune_runs": ft_runs_before + 1,
+            "last_loss": float(last_loss) if last_loss is not None else None,
+            "vocab_size": tokenizer.vocab_size,
+            "saved_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "interrupted": interrupted_flag,
+            "fine_tuned": True,
+            "fine_tune_examples": len(examples),
+        }
+
+    # Snapshot every few minutes and after each epoch, so a crash or a
+    # dropped Colab session mid-run loses minutes, not the whole run (and
+    # the metadata never falls behind the checkpoint).
+    AUTOSAVE_SECONDS = 600
+    last_save = time.time()
     try:
         for epoch in range(1, epochs + 1):
             order = list(range(len(examples)))
@@ -438,6 +547,8 @@ def finetune(model_name):
                 # non-masked) tokens -- see architecture.py -- so averaging
                 # it further just means averaging the per-batch means below,
                 # not dividing by a raw token count like this used to.
+                if stop.check():
+                    raise KeyboardInterrupt      # same save-and-exit path as Ctrl+C
                 loss, grads = model.loss_and_grads(input_ids, target_ids, loss_mask=loss_mask)
                 acc = grads if acc is None else {k: acc[k] + grads[k] for k in acc}
                 n_acc += 1
@@ -452,6 +563,10 @@ def finetune(model_name):
                     acc, n_acc = None, 0
                     run_step += 1
                     total_steps += 1
+                    if time.time() - last_save > AUTOSAVE_SECONDS:
+                        save_checkpoint(model, checkpoint_path, meta_path, make_meta(True))
+                        last_save = time.time()
+                        print(f"  (autosaved at step {total_steps})")
 
                 if epoch == 1 and n_batches == 10:
                     per_step = (time.time() - t_start) / 10
@@ -462,26 +577,21 @@ def finetune(model_name):
             avg = epoch_loss / max(n_batches, 1)
             print(f"  epoch {epoch}/{epochs}  avg loss={avg:.3f}  "
                   f"batches={n_batches}  time={time.time() - t_epoch:.0f}s  "
-                  f"total_steps={total_steps}")
+                  f"steps this run={total_steps - steps_before}  total={total_steps}")
+            save_checkpoint(model, checkpoint_path, meta_path, make_meta(True))
+            last_save = time.time()
 
     except KeyboardInterrupt:
         interrupted = True
-        print("\nInterrupted -- saving before exit...")
+        print("\nStopped -- saving before exit...")
 
-    meta = {
-        "model_name": model_name,
-        "total_steps": total_steps,
-        "last_loss": float(last_loss) if last_loss is not None else None,
-        "vocab_size": tokenizer.vocab_size,
-        "saved_at": time.strftime("%Y-%m-%d %H:%M:%S"),
-        "interrupted": interrupted,
-        "fine_tuned": True,
-        "fine_tune_examples": len(examples),
-    }
-    save_checkpoint(model, checkpoint_path, meta_path, meta)
+    stop.close()
+    save_checkpoint(model, checkpoint_path, meta_path, make_meta(interrupted))
     print(f"Saved {checkpoint_path}")
-    print(f"Saved {meta_path}")
-    print(f"\nOriginal pre-finetune weights are still at {backup_path} if you want to revert.")
+    print(f"Saved {meta_path}  (total steps {total_steps}: "
+          f"{total_steps - steps_before} this run, {ft_steps_before + total_steps - steps_before} fine-tuning overall)")
+    print(f"\nTo revert: {backup_path} is the untouched base model; "
+          f"{last_backup_path} is the model from just before this run.")
     print("Fine-tuning stopped early but progress is saved." if interrupted else "Fine-tuning complete.")
 
 
