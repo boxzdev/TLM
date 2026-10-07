@@ -20,7 +20,9 @@ import importlib.util
 import json
 import math
 import os
+import select
 import sys
+import threading
 import time
 
 import numpy as np
@@ -92,6 +94,65 @@ def build_chunks(ids, seq_length):
         chunks.append((ids[i:i + seq_length], ids[i + 1:i + seq_length + 1]))
         i += seq_length
     return chunks
+
+
+# --- stopping without Ctrl+C -------------------------------------------------
+# Tablets, phone keyboards and some web terminals (Lightning AI, Codespaces
+# in a browser) can't send Ctrl+C. Two other ways to end a run -- both
+# finish the current step, save checkpoint + metadata, and exit, exactly
+# like Ctrl+C does:
+#   * type  stop  and press Enter in the same terminal
+#   * create an empty file named STOP in the model's folder (from a second
+#     terminal or the file browser; also the way to do it in a notebook,
+#     where typing into a running script isn't possible)
+STOP_WORDS = {"stop", "quit", "exit", "cancel", "save"}
+
+
+class StopListener:
+    def __init__(self, stop_file):
+        self.stop_file = stop_file
+        self.requested = False
+        self._done = False
+        try:                                  # a STOP file left over from last time
+            os.remove(stop_file)              # must not end this run instantly
+        except OSError:
+            pass
+        threading.Thread(target=self._listen, daemon=True).start()
+
+    def _listen(self):
+        # Polls the raw terminal with select() instead of blocking in
+        # sys.stdin.readline(): a daemon thread stuck inside a blocking
+        # stdin read can crash Python when the script finishes.
+        buf = b""
+        try:
+            while not self._done:
+                ready, _, _ = select.select([0], [], [], 0.5)
+                if not ready:
+                    continue
+                chunk = os.read(0, 4096)
+                if not chunk:                 # stdin closed / piped input ran out
+                    return
+                buf += chunk
+                while b"\n" in buf:
+                    line, buf = buf.split(b"\n", 1)
+                    if line.decode("utf-8", "ignore").strip().lower() in STOP_WORDS:
+                        self.requested = True
+                        return
+        except (OSError, ValueError):
+            return                            # no usable stdin; the STOP file still works
+
+    def check(self):
+        if not self.requested and os.path.exists(self.stop_file):
+            self.requested = True
+        if self.requested:
+            try:
+                os.remove(self.stop_file)
+            except OSError:
+                pass
+        return self.requested
+
+    def close(self):
+        self._done = True
 
 
 # --- learning-rate schedule --------------------------------------------------
@@ -250,7 +311,9 @@ def train(model_name):
     preview = make_preview_fn(architecture)
     print_every = max(1, batches_per_epoch // 5)
 
-    print("\nTraining -- Ctrl+C any time to stop and save.\n")
+    stop = StopListener(os.path.join(model_dir, "STOP"))
+    print("\nTraining. To stop and save: press Ctrl+C, OR type  stop  and press Enter,")
+    print(f"OR create an empty file named STOP in {model_dir}\n")
 
     interrupted = False
 
@@ -263,6 +326,7 @@ def train(model_name):
 
     def autosave():
         save_checkpoint(model, checkpoint_path, meta_path, {
+            **prev_meta,
             "model_name": model_name,
             "total_steps": total_steps,
             "last_loss": float(last_loss) if last_loss is not None else None,
@@ -278,6 +342,8 @@ def train(model_name):
             epoch_loss = 0.0
             acc, n_acc = None, 0
             for step_i, (inputs, targets) in enumerate(batch_iter(chunks, order, batch_size), 1):
+                if stop.check():
+                    raise KeyboardInterrupt      # same save-and-exit path as Ctrl+C
                 loss, grads = model.loss_and_grads(inputs, targets)
                 acc = grads if acc is None else {k: acc[k] + grads[k] for k in acc}
                 n_acc += 1
@@ -309,9 +375,11 @@ def train(model_name):
 
     except KeyboardInterrupt:
         interrupted = True
-        print("\nInterrupted -- saving before exit...")
+        print("\nStopped -- saving before exit...")
 
+    stop.close()
     meta = {
+        **prev_meta,
         "model_name": model_name,
         "total_steps": total_steps,
         "last_loss": float(last_loss) if last_loss is not None else None,
